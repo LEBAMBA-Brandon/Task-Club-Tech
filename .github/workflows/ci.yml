@@ -1,0 +1,72 @@
+name: CI/CD
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  api:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Installer PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+          extensions: pdo_sqlite, pdo_pgsql
+
+      - name: Préparer Laravel et installer les dépendances
+        working-directory: task-ctech-api
+        run: |
+          cp .env.example .env
+          composer install --no-interaction --prefer-dist
+          php artisan key:generate
+
+      - name: Tester l’API
+        working-directory: task-ctech-api
+        run: php artisan test
+
+      - name: Vérifier la construction Docker
+        run: docker build -t ctech-api ./task-ctech-api
+
+  flutter:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Installer les dépendances Flutter
+        working-directory: task_ctech
+        run: flutter pub get
+
+      - name: Analyser et tester
+        working-directory: task_ctech
+        run: |
+          flutter analyze
+          flutter test
+
+      - name: Construire l’APK Android
+        working-directory: task_ctech
+        run: flutter build apk --release
+
+      - name: Conserver l’APK comme artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: task_ctech/build/app/outputs/flutter-apk/app-release.apk
+
+      - name: Construire l’APP Web
+        working-directory: task_ctech
+        run: flutter build web
+
+      - name: Conserver l’APP Web comme artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-app
+          path: task_ctech/build/web
