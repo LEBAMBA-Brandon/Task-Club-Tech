@@ -1,0 +1,39 @@
+name: task_ctech
+description: "C-Tech Tasks — gestion des tâches par département du Club-Tech (C-Tech)."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.13.7
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  # State management
+  flutter_riverpod: ^3.0.0
+  # Réseau (API Laravel)
+  dio: ^5.9.0
+  # Stockage : jeton chiffré + cache hors ligne
+  flutter_secure_storage: ^9.2.4
+  shared_preferences: ^2.5.3
+  # Notifications push (Android)
+  firebase_core: ^4.0.0
+  firebase_messaging: ^16.0.0
+  flutter_local_notifications: ^19.4.0
+  # Interface
+  google_fonts: ^6.3.0
+  intl: ^0.20.2
+  cupertino_icons: ^1.0.8
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/
