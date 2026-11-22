@@ -35,6 +35,18 @@ class TaskRepository {
     }
   }
 
+  /// Nombre de tâches reçues non lues (badge de l'onglet « Reçues »).
+  /// Hors ligne : 0 (on n'affiche pas de badge faux).
+  Future<int> unreadCount() async {
+    try {
+      final data = await _api.get('/tasks/unread-count');
+      return (data['count'] as num?)?.toInt() ?? 0;
+    } on ApiException catch (e) {
+      if (e.isOffline) return 0;
+      rethrow;
+    }
+  }
+
   Future<Task> show(int id) async {
     try {
       final data = await _api.get('/tasks/$id');

@@ -39,7 +39,11 @@ class _TaskListScreenState extends ConsumerState<TaskListScreen> {
       ),
       Expanded(
         child: RefreshIndicator(
-          onRefresh: () => ref.refresh(taskListProvider(_query).future),
+          onRefresh: () async {
+            ref.invalidate(unreadCountProvider);
+            ref.invalidate(taskListProvider(_query));
+            await ref.read(taskListProvider(_query).future);
+          },
           child: async.when(
             loading: () => const Center(child: CircularProgressIndicator()),
             error: (e, _) => ListView(children: [
@@ -102,7 +106,7 @@ class _TaskListScreenState extends ConsumerState<TaskListScreen> {
 
   Future<void> _open(int id) async {
     await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => TaskDetailScreen(taskId: id)));
-    if (mounted) ref.invalidate(taskListProvider);
+    if (mounted) refreshTaskLists(ref);
   }
 }
 

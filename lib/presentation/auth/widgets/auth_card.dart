@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -10,7 +9,9 @@ import '../../../data/repositories/auth_repository.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/core_providers.dart';
 import '../../../providers/data_providers.dart';
+import '../../help/legal_screen.dart';
 import 'auth_widgets.dart';
+import 'code_input.dart';
 
 /// Écrans possibles de la carte.
 enum AuthMode { signIn, signUp, verifyEmail, forgot, reset, pending }
@@ -431,24 +432,9 @@ class _SignUpFormState extends ConsumerState<_SignUpForm> {
     );
   }
 
-  void _showTerms(BuildContext context) => showDialog<void>(
-        context: context,
-        builder: (_) => AlertDialog(
-          title: const Text('Conditions d\'utilisation'),
-          content: const SingleChildScrollView(
-            child: Text(
-              'C-Tech Tasks est réservé aux membres du Club-Tech (C-Tech).\n\n'
-              '• Chaque compte est personnel et validé par le bureau.\n'
-              '• Les tâches et commentaires concernent uniquement les activités du club.\n'
-              '• Vos nom, prénom, e-mail, département et poste sont visibles des membres '
-              'concernés par vos tâches. Ils ne sont jamais partagés hors du club.\n'
-              '• Votre accusé de lecture (reçu, vu, effectué) est visible par l\'auteur de la tâche.\n'
-              '• Tout usage abusif peut entraîner la suspension du compte.',
-            ),
-          ),
-          actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Fermer'))],
-        ),
-      );
+  /// Ouvre le texte complet des conditions d'utilisation.
+  void _showTerms(BuildContext context) =>
+      Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => LegalScreen.terms()));
 }
 
 // ============================================================== Code e-mail (double authentification)
@@ -468,7 +454,17 @@ class _VerifyFormState extends ConsumerState<_VerifyForm> {
   final _form = GlobalKey<FormState>();
   final _code = TextEditingController();
   bool _loading = false;
+  bool _codeError = false;
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    // Dès que l'utilisateur corrige le code, on retire l'état d'erreur.
+    _code.addListener(() {
+      if (_codeError && _code.text.length < 6) setState(() => _codeError = false);
+    });
+  }
 
   @override
   void dispose() {
@@ -477,7 +473,14 @@ class _VerifyFormState extends ConsumerState<_VerifyForm> {
   }
 
   Future<void> _submit() async {
-    if (!_form.currentState!.validate()) return;
+    if (_loading) return;
+    if (Validators.code(_code.text) != null) {
+      setState(() {
+        _codeError = true;
+        _error = 'Entrez les 6 chiffres du code.';
+      });
+      return;
+    }
     setState(() {
       _loading = true;
       _error = null;
@@ -486,7 +489,12 @@ class _VerifyFormState extends ConsumerState<_VerifyForm> {
       await ref.read(authRepositoryProvider).verifyEmail(widget.email, _code.text);
       if (mounted) widget.onNavigate(AuthMode.pending);
     } on ApiException catch (e) {
-      if (mounted) setState(() => _error = e.message);
+      if (mounted) {
+        setState(() {
+          _error = e.message;
+          _codeError = true;
+        });
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -509,18 +517,14 @@ class _VerifyFormState extends ConsumerState<_VerifyForm> {
       key: _form,
       child: Column(children: [
         AuthError(_error),
-        AuthField(
-          label: 'Code à 6 chiffres',
-          hint: '••••••',
+        CodeInput(
           controller: _code,
-          icon: Icons.verified_user_outlined,
-          keyboardType: TextInputType.number,
-          maxLength: 6,
-          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-          textInputAction: TextInputAction.done,
-          onSubmitted: (_) => _submit(),
-          validator: Validators.code,
+          accent: widget.accent,
+          hasError: _codeError,
+          onCompleted: (_) => _submit(),
         ),
+        PasteCodeButton(controller: _code, accent: widget.accent),
+        const SizedBox(height: 8),
         AccentButton(label: 'Vérifier', color: widget.accent, loading: _loading, onPressed: _submit),
         const SizedBox(height: 10),
         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
@@ -613,6 +617,7 @@ class _ResetFormState extends ConsumerState<_ResetForm> {
   final _password = TextEditingController();
   final _confirm = TextEditingController();
   bool _loading = false;
+  bool _codeError = false;
   String? _error;
 
   @override
@@ -624,6 +629,14 @@ class _ResetFormState extends ConsumerState<_ResetForm> {
   }
 
   Future<void> _submit() async {
+    if (Validators.code(_code.text) != null) {
+      setState(() {
+        _codeError = true;
+        _error = 'Entrez les 6 chiffres du code.';
+      });
+      return;
+    }
+    if (_codeError) setState(() => _codeError = false);
     if (!_form.currentState!.validate()) return;
     setState(() {
       _loading = true;
@@ -632,11 +645,17 @@ class _ResetFormState extends ConsumerState<_ResetForm> {
     try {
       final message =
           await ref.read(authRepositoryProvider).resetPassword(widget.email, _code.text, _password.text, _confirm.text);
+      _codeError = false;
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
       widget.onNavigate(AuthMode.signIn);
     } on ApiException catch (e) {
-      if (mounted) setState(() => _error = e.message);
+      if (mounted) {
+        setState(() {
+          _error = e.message;
+          _codeError = e.fieldErrors.containsKey('code');
+        });
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -648,16 +667,17 @@ class _ResetFormState extends ConsumerState<_ResetForm> {
       key: _form,
       child: Column(children: [
         AuthError(_error),
-        AuthField(
-          label: 'Code reçu',
-          hint: '••••••',
-          controller: _code,
-          icon: Icons.pin_outlined,
-          keyboardType: TextInputType.number,
-          maxLength: 6,
-          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-          validator: Validators.code,
+        const Align(
+          alignment: Alignment.centerLeft,
+          child: Padding(
+            padding: EdgeInsets.only(bottom: 8),
+            child: Text('Code reçu par e-mail',
+                style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
+          ),
         ),
+        CodeInput(controller: _code, accent: widget.accent, hasError: _codeError),
+        PasteCodeButton(controller: _code, accent: widget.accent),
+        const SizedBox(height: 6),
         AuthField(
           label: 'Nouveau mot de passe',
           hint: '8 caractères, Aa1',

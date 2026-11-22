@@ -107,6 +107,16 @@ class AuthRepository {
     }
   }
 
+  /// Changement de mot de passe depuis le profil.
+  Future<String> changePassword(String current, String password, String confirmation) async {
+    final data = await _api.put('/auth/password', {
+      'current_password': current,
+      'password': password,
+      'password_confirmation': confirmation,
+    });
+    return data['message'] as String;
+  }
+
   Future<void> updateFcmToken(String? token) => _api.put('/auth/fcm-token', {'fcm_token': token});
 
   /// Déconnexion : révoque le jeton côté serveur (si possible) et efface tout localement.

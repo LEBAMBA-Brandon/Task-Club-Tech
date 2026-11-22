@@ -100,7 +100,9 @@ class PushNotificationService {
   }
 
   /// Demande l'autorisation (Android 13+) et envoie le jeton FCM à l'API.
+  /// Ne fait rien si l'utilisateur a désactivé les notifications dans son profil.
   Future<void> registerDevice() async {
+    if (_ref.read(cacheStorageProvider).getString('push_enabled') == 'false') return;
     if (!await init()) return;
     try {
       await FirebaseMessaging.instance.requestPermission();
@@ -112,6 +114,13 @@ class PushNotificationService {
     } catch (e) {
       debugPrint('Enregistrement FCM impossible : $e');
     }
+  }
+
+  /// Désactive les notifications : le serveur oublie le jeton de ce téléphone.
+  Future<void> unregisterDevice() async {
+    await _tokenSub?.cancel();
+    _tokenSub = null;
+    await _ref.read(authRepositoryProvider).updateFcmToken(null);
   }
 
   /// Accusé « reçu » dès l'arrivée de la notification.
