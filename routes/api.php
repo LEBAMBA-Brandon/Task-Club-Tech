@@ -63,6 +63,10 @@ Route::prefix('v1')->group(function () {
         // Administration (président / vice-président)
         Route::get('admin/departments', [MemberController::class, 'departments']);
         Route::patch('members/{user}', [MemberController::class, 'update']);
+        Route::delete('members/{user}', [MemberController::class, 'destroy']);
+        Route::post('admin/departments', [MemberController::class, 'storeDepartment']);
+        Route::patch('admin/departments/{department}', [MemberController::class, 'updateDepartment']);
+        Route::delete('admin/departments/{department}', [MemberController::class, 'destroyDepartment']);
 
         // Messagerie
         Route::get('conversations', [ChatController::class, 'index']);

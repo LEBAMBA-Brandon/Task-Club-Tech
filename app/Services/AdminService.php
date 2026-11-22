@@ -5,18 +5,21 @@ namespace App\Services;
 use App\Enums\Position;
 use App\Enums\UserStatus;
 use App\Models\Department;
+use App\Models\Task;
 use App\Models\TaskRecipient;
 use App\Models\User;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 /**
  * Administration du système, réservée au PRÉSIDENT et au VICE-PRÉSIDENT :
  *  - vue d'ensemble de tous les départements (membres, demandes, avancement des tâches) ;
  *  - gestion de n'importe quel membre : changer de département ou de poste,
- *    suspendre ou réactiver un compte.
+ *    suspendre, réactiver ou supprimer un compte ;
+ *  - gestion des départements : créer, renommer, supprimer.
  * Les responsables, eux, ne voient que leur département (voir MemberService).
  */
 class AdminService
@@ -116,5 +119,93 @@ class AdminService
         });
 
         return $member->fresh('department');
+    }
+
+    /**
+     * Supprime définitivement un compte.
+     * L'historique reste : ses tâches, commentaires et messages sont signés « Ancien membre ».
+     * Garde-fous : on ne se supprime pas soi-même ; le vice-président ne peut pas supprimer le président.
+     */
+    public function deleteMember(User $admin, User $member): void
+    {
+        $this->assertAdmin($admin);
+
+        if ($admin->id === $member->id) {
+            throw ValidationException::withMessages(['user' => 'Vous ne pouvez pas supprimer votre propre compte.']);
+        }
+        if ($member->position === Position::President && $admin->position !== Position::President) {
+            throw ValidationException::withMessages(['user' => 'Seul le président peut supprimer le compte du président.']);
+        }
+
+        DB::transaction(function () use ($member) {
+            $member->tokens()->delete(); // jetons de connexion (non liés par clé étrangère)
+            $member->delete();           // le reste suit automatiquement (accusés, codes, participations...)
+        });
+    }
+
+    /** Crée un département (postes : responsable et membres). */
+    public function createDepartment(User $admin, string $name): Department
+    {
+        $this->assertAdmin($admin);
+        $this->assertUniqueName($name);
+
+        return Department::create(['name' => trim($name), 'slug' => $this->uniqueSlug($name)]);
+    }
+
+    /** Renomme un département (son identifiant interne ne change pas). */
+    public function renameDepartment(User $admin, Department $department, string $name): Department
+    {
+        $this->assertAdmin($admin);
+        $this->assertUniqueName($name, $department->id);
+        $department->update(['name' => trim($name)]);
+
+        return $department;
+    }
+
+    /**
+     * Supprime un département.
+     *  - La Présidence ne peut pas être supprimée.
+     *  - Le département doit être vide : ses membres doivent d'abord être déplacés ou supprimés.
+     *  - Ses tâches (et leurs accusés / commentaires) et son groupe de discussion sont supprimés avec lui.
+     */
+    public function deleteDepartment(User $admin, Department $department): void
+    {
+        $this->assertAdmin($admin);
+
+        if ($department->slug === Department::PRESIDENCY_SLUG) {
+            throw ValidationException::withMessages(['department' => 'La Présidence ne peut pas être supprimée.']);
+        }
+        $members = $department->users()->count();
+        if ($members > 0) {
+            throw ValidationException::withMessages([
+                'department' => "Ce département compte encore {$members} membre(s) : déplacez-les ou supprimez-les d'abord.",
+            ]);
+        }
+
+        DB::transaction(function () use ($department) {
+            Task::withTrashed()->where('department_id', $department->id)->get()->each->forceDelete();
+            $department->delete();
+        });
+    }
+
+    private function assertUniqueName(string $name, ?int $ignoreId = null): void
+    {
+        $exists = Department::whereRaw('LOWER(name) = ?', [mb_strtolower(trim($name))])
+            ->when($ignoreId, fn ($q) => $q->where('id', '!=', $ignoreId))
+            ->exists();
+        if ($exists) {
+            throw ValidationException::withMessages(['name' => 'Un département porte déjà ce nom.']);
+        }
+    }
+
+    private function uniqueSlug(string $name): string
+    {
+        $base = Str::slug($name) ?: 'departement';
+        $slug = $base;
+        for ($i = 2; Department::where('slug', $slug)->exists(); $i++) {
+            $slug = "{$base}-{$i}";
+        }
+
+        return $slug;
     }
 }

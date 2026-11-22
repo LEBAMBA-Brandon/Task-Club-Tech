@@ -19,8 +19,16 @@ class DepartmentSeeder extends Seeder
         'bureau-executif' => 'Bureau exécutif',
     ];
 
+    /**
+     * Crée les départements de départ UNIQUEMENT si la table est vide :
+     * ce seeder tourne à chaque démarrage du serveur, il ne doit pas recréer
+     * un département supprimé par la présidence ni écraser un nom modifié.
+     */
     public function run(): void
     {
+        if (Department::exists()) {
+            return;
+        }
         foreach (self::DEPARTMENTS as $slug => $name) {
             Department::updateOrCreate(['slug' => $slug], ['name' => $name]);
         }

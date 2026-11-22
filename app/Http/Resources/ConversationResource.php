@@ -21,7 +21,7 @@ class ConversationResource extends JsonResource
             'type' => $this->type,
             'title' => $this->isDepartment()
                 ? 'Groupe '.$this->department?->name
-                : ($other?->fullName() ?? 'Conversation'),
+                : ($other?->fullName() ?? 'Ancien membre'),
             'subtitle' => $this->isDepartment()
                 ? $this->participants->count().' membres'
                 : ($other ? $other->position->label().' · '.$other->department?->name : null),

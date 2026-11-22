@@ -27,7 +27,7 @@ class TaskResource extends JsonResource
             'urgency_label' => $this->urgency->label(),
             'due_at' => $this->due_at?->toIso8601String(),
             'created_at' => $this->created_at->toIso8601String(),
-            'creator' => new UserResource($this->creator),
+            'creator' => UserResource::orDeleted($this->creator),
             'department' => new DepartmentResource($this->department),
             'is_mine' => $this->creator_id === $user->id,
             'my_state' => $mine ? new TaskRecipientResource($mine) : null,

@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\MemberResource;
 use App\Http\Resources\UserResource;
+use App\Http\Resources\DepartmentResource;
+use App\Models\Department;
 use App\Models\User;
 use App\Services\AdminService;
 use App\Services\MemberService;
@@ -49,6 +51,39 @@ class MemberController extends Controller
         $fresh = $this->members->list($request->user(), [])->firstWhere('id', $updated->id) ?? $updated;
 
         return new MemberResource($fresh);
+    }
+
+    /** DELETE /members/{user} : suppression définitive d'un compte (président / vice-président). */
+    public function destroy(Request $request, User $user, AdminService $admin): JsonResponse
+    {
+        $admin->deleteMember($request->user(), $user);
+
+        return response()->json(['message' => 'Compte supprimé.']);
+    }
+
+    /** POST /admin/departments {name} */
+    public function storeDepartment(Request $request, AdminService $admin): JsonResponse
+    {
+        $data = $request->validate(['name' => ['required', 'string', 'min:2', 'max:80']]);
+
+        return (new DepartmentResource($admin->createDepartment($request->user(), $data['name'])))
+            ->response()->setStatusCode(201);
+    }
+
+    /** PATCH /admin/departments/{department} {name} */
+    public function updateDepartment(Request $request, Department $department, AdminService $admin): DepartmentResource
+    {
+        $data = $request->validate(['name' => ['required', 'string', 'min:2', 'max:80']]);
+
+        return new DepartmentResource($admin->renameDepartment($request->user(), $department, $data['name']));
+    }
+
+    /** DELETE /admin/departments/{department} */
+    public function destroyDepartment(Request $request, Department $department, AdminService $admin): JsonResponse
+    {
+        $admin->deleteDepartment($request->user(), $department);
+
+        return response()->json(['message' => 'Département supprimé.']);
     }
 
     /** GET /directory?search= : annuaire des membres actifs (pour démarrer une conversation). */

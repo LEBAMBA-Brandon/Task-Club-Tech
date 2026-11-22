@@ -12,7 +12,7 @@ class CommentResource extends JsonResource
         return [
             'id' => $this->id,
             'body' => $this->body,
-            'author' => new UserResource($this->user),
+            'author' => UserResource::orDeleted($this->user),
             'is_mine' => $this->user_id === $request->user()->id,
             'created_at' => $this->created_at->toIso8601String(),
         ];

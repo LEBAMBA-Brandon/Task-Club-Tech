@@ -22,4 +22,27 @@ class UserResource extends JsonResource
             'created_at' => $this->created_at?->toIso8601String(),
         ];
     }
+
+    /**
+     * Auteur éventuellement supprimé : renvoie un « Ancien membre » au même format,
+     * pour que l'application n'ait jamais d'auteur vide à gérer.
+     */
+    public static function orDeleted(mixed $user): UserResource|array
+    {
+        if ($user) {
+            return new self($user);
+        }
+
+        return [
+            'id' => 0,
+            'first_name' => 'Ancien',
+            'last_name' => 'membre',
+            'email' => '',
+            'position' => 'membre',
+            'position_label' => 'Compte supprimé',
+            'status' => 'deleted',
+            'department' => null,
+            'created_at' => null,
+        ];
+    }
 }

@@ -47,9 +47,33 @@ class AdminTest extends TestCase
         // Le VP fait partie de tous les groupes de département.
         $this->getJson('/api/v1/conversations')->assertOk()->assertJsonCount(8, 'data');
 
+        // Départements : créer, renommer, supprimer (vide), protéger la Présidence.
+        $newId = $this->postJson('/api/v1/admin/departments', ['name' => 'Événementiel'])
+            ->assertCreated()->json('data.id');
+        $this->postJson('/api/v1/admin/departments', ['name' => 'événementiel'])->assertUnprocessable();
+        $this->patchJson("/api/v1/admin/departments/{$newId}", ['name' => 'Événements'])
+            ->assertOk()->assertJsonPath('data.name', 'Événements');
+        $this->deleteJson("/api/v1/admin/departments/{$com->id}")->assertUnprocessable(); // a encore des membres
+        $this->deleteJson("/api/v1/admin/departments/{$presidence->id}")->assertUnprocessable();
+        $this->deleteJson("/api/v1/admin/departments/{$newId}")->assertOk();
+
+        // Supprimer un membre : ses tâches restent, signées « Ancien membre ».
+        Sanctum::actingAs($member->fresh());
+        $this->patchJson("/api/v1/members/{$member->id}", ['status' => 'active'])->assertForbidden();
+        Sanctum::actingAs($vp);
+        $this->patchJson("/api/v1/members/{$member->id}", ['status' => 'active'])->assertOk();
+        Sanctum::actingAs($member->fresh());
+        $taskId = $this->postJson('/api/v1/tasks', ['title' => 'Test', 'department_id' => $com->id, 'urgency' => 'green'])
+            ->assertCreated()->json('data.id');
+        Sanctum::actingAs($vp);
+        $this->deleteJson("/api/v1/members/{$member->id}")->assertOk();
+        $this->assertDatabaseMissing('users', ['id' => $member->id]);
+        $this->getJson("/api/v1/tasks/{$taskId}")->assertOk()->assertJsonPath('data.creator.first_name', 'Ancien');
+        $this->deleteJson("/api/v1/members/{$vp->id}")->assertUnprocessable(); // pas soi-même
+
         // Un responsable n'a pas accès à l'administration.
         Sanctum::actingAs($responsable);
         $this->getJson('/api/v1/admin/departments')->assertForbidden();
-        $this->patchJson("/api/v1/members/{$member->id}", ['status' => 'active'])->assertForbidden();
+        $this->postJson('/api/v1/admin/departments', ['name' => 'Pirate'])->assertForbidden();
     }
 }
