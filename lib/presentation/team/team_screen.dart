@@ -132,11 +132,29 @@ class _DepartmentsTab extends ConsumerWidget {
                   _Kpi(icon: Icons.task_alt_rounded, value: '$totalTasks', label: 'tâches envoyées', color: AppColors.blue),
                 ]),
                 const SizedBox(height: 16),
+                Row(children: [
+                  Text('${items.length} départements', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                  const Spacer(),
+                  FilledButton.tonalIcon(
+                    icon: const Icon(Icons.add_rounded),
+                    label: const Text('Nouveau département'),
+                    onPressed: () => _DepartmentAdmin.create(context, ref),
+                  ),
+                ]),
+                const SizedBox(height: 12),
                 LayoutBuilder(builder: (context, c) {
                   final width = (c.maxWidth - 12 * (columns - 1)) / columns;
                   return Wrap(spacing: 12, runSpacing: 12, children: [
                     for (final d in items)
-                      SizedBox(width: width, child: _DepartmentCard(department: d, onTap: () => onOpen(d.id))),
+                      SizedBox(
+                        width: width,
+                        child: _DepartmentCard(
+                          department: d,
+                          onTap: () => onOpen(d.id),
+                          onRename: () => _DepartmentAdmin.rename(context, ref, d),
+                          onDelete: d.isPresidency ? null : () => _DepartmentAdmin.delete(context, ref, d),
+                        ),
+                      ),
                   ]);
                 }),
               ],
@@ -172,9 +190,13 @@ class _Kpi extends StatelessWidget {
 }
 
 class _DepartmentCard extends StatelessWidget {
-  const _DepartmentCard({required this.department, required this.onTap});
+  const _DepartmentCard({required this.department, required this.onTap, required this.onRename, this.onDelete});
   final DepartmentOverview department;
   final VoidCallback onTap;
+  final VoidCallback onRename;
+
+  /// null pour la Présidence (non supprimable).
+  final VoidCallback? onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -191,6 +213,23 @@ class _DepartmentCard extends StatelessWidget {
               Expanded(child: Text(d.name, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15))),
               if (d.membersPending > 0)
                 Badge(label: Text('${d.membersPending} à valider'), backgroundColor: AppColors.urgencyColor('yellow')),
+              // Menu d'administration du département.
+              PopupMenuButton<String>(
+                tooltip: 'Gérer le département',
+                icon: const Icon(Icons.more_vert, size: 20),
+                onSelected: (action) => action == 'rename' ? onRename() : onDelete?.call(),
+                itemBuilder: (_) => [
+                  const PopupMenuItem(value: 'rename', child: ListTile(leading: Icon(Icons.edit_outlined), title: Text('Renommer'))),
+                  if (onDelete != null)
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: ListTile(
+                        leading: Icon(Icons.delete_outline, color: AppColors.error),
+                        title: Text('Supprimer', style: TextStyle(color: AppColors.error)),
+                      ),
+                    ),
+                ],
+              ),
             ]),
             const SizedBox(height: 4),
             Text(d.responsable == null ? 'Pas de responsable' : 'Responsable : ${d.responsable}',
@@ -482,6 +521,17 @@ class _MemberSheet extends ConsumerWidget {
                 ),
               ],
             ]),
+            // Suppression définitive (pas sur soi-même ; le VP ne supprime pas le président).
+            if (u.id != me?.id && !(u.position == 'president' && me?.position != 'president'))
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  style: TextButton.styleFrom(foregroundColor: AppColors.error),
+                  icon: const Icon(Icons.person_remove_outlined),
+                  label: const Text('Supprimer le compte'),
+                  onPressed: () => _deleteMember(context, ref),
+                ),
+              ),
           ],
         ]),
       ),
@@ -495,6 +545,37 @@ class _MemberSheet extends ConsumerWidget {
     final messenger = ScaffoldMessenger.of(context);
     Navigator.of(context).pop();
     messenger.showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  /// Suppression définitive : ses tâches, commentaires et messages restent, signés « Ancien membre ».
+  Future<void> _deleteMember(BuildContext context, WidgetRef ref) async {
+    final u = member.user;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('Supprimer le compte de ${u.fullName} ?'),
+        content: const Text(
+          'Cette action est définitive : la personne ne pourra plus se connecter et devra se réinscrire. '
+          'Les tâches, commentaires et messages qu\'elle a écrits restent visibles, signés « Ancien membre ». '
+          'Pour un départ temporaire, préférez « Suspendre ».',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Annuler')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.error),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Supprimer'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !context.mounted) return;
+    try {
+      await ref.read(teamRepositoryProvider).deleteMember(u.id);
+      if (context.mounted) _done(context, ref, 'Compte de ${u.fullName} supprimé.');
+    } catch (e) {
+      if (context.mounted) showError(context, e);
+    }
   }
 
   /// Suspendre (déconnecte le membre de tous ses appareils) ou réactiver un compte.
@@ -600,5 +681,114 @@ class _EditMemberDialogState extends State<_EditMemberDialog> {
         ),
       ],
     );
+  }
+}
+
+/// Actions d'administration sur les départements (président / vice-président).
+class _DepartmentAdmin {
+  _DepartmentAdmin._();
+
+  /// Après un changement : tableau de bord, listes déroulantes et membres à jour.
+  static void _refresh(WidgetRef ref) {
+    ref.invalidate(departmentsOverviewProvider);
+    ref.invalidate(metaProvider);
+    ref.invalidate(membersProvider);
+    ref.invalidate(conversationsProvider);
+  }
+
+  /// Petite boîte de saisie du nom.
+  static Future<String?> _askName(BuildContext context, {required String title, String initial = ''}) {
+    final controller = TextEditingController(text: initial);
+    return showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(title),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          maxLength: 80,
+          textCapitalization: TextCapitalization.sentences,
+          decoration: const InputDecoration(labelText: 'Nom du département'),
+          onSubmitted: (v) => Navigator.pop(dialogContext, v.trim()),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Annuler')),
+          FilledButton(onPressed: () => Navigator.pop(dialogContext, controller.text.trim()), child: const Text('Enregistrer')),
+        ],
+      ),
+    );
+  }
+
+  static Future<void> create(BuildContext context, WidgetRef ref) async {
+    final name = await _askName(context, title: 'Nouveau département');
+    if (name == null || name.length < 2 || !context.mounted) return;
+    try {
+      await ref.read(teamRepositoryProvider).createDepartment(name);
+      _refresh(ref);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Département « $name » créé.')));
+      }
+    } catch (e) {
+      if (context.mounted) showError(context, e);
+    }
+  }
+
+  static Future<void> rename(BuildContext context, WidgetRef ref, DepartmentOverview d) async {
+    final name = await _askName(context, title: 'Renommer « ${d.name} »', initial: d.name);
+    if (name == null || name.length < 2 || name == d.name || !context.mounted) return;
+    try {
+      await ref.read(teamRepositoryProvider).renameDepartment(d.id, name);
+      _refresh(ref);
+    } catch (e) {
+      if (context.mounted) showError(context, e);
+    }
+  }
+
+  static Future<void> delete(BuildContext context, WidgetRef ref, DepartmentOverview d) async {
+    final members = d.membersActive + d.membersPending + d.membersSuspended;
+    if (members > 0) {
+      // Le serveur refuserait : on explique tout de suite quoi faire.
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: Text('Impossible de supprimer « ${d.name} »'),
+          content: Text('Ce département compte encore $members membre${members > 1 ? 's' : ''}. '
+              'Déplacez-les vers un autre département (ou supprimez leur compte) depuis l\'onglet Membres, puis réessayez.'),
+          actions: [TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Compris'))],
+        ),
+      );
+      return;
+    }
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('Supprimer « ${d.name} » ?'),
+        content: Text(d.tasksCount == 0
+            ? 'Le département et son groupe de discussion seront supprimés.'
+            : 'Le département, son groupe de discussion et ses ${d.tasksCount} tâche${d.tasksCount > 1 ? 's' : ''} '
+                'seront supprimés définitivement.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Annuler')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.error),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Supprimer'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !context.mounted) return;
+    try {
+      await ref.read(teamRepositoryProvider).deleteDepartment(d.id);
+      if (ref.read(memberDepartmentFilterProvider) == d.id) {
+        ref.read(memberDepartmentFilterProvider.notifier).set(null);
+      }
+      _refresh(ref);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Département « ${d.name} » supprimé.')));
+      }
+    } catch (e) {
+      if (context.mounted) showError(context, e);
+    }
   }
 }

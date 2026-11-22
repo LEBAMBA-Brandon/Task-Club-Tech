@@ -3,6 +3,7 @@ class DepartmentOverview {
   const DepartmentOverview({
     required this.id,
     required this.name,
+    this.slug = '',
     this.responsable,
     this.membersActive = 0,
     this.membersPending = 0,
@@ -15,6 +16,11 @@ class DepartmentOverview {
 
   final int id;
   final String name;
+
+  /// Identifiant interne (« presidence » ne peut pas être supprimé).
+  final String slug;
+
+  bool get isPresidency => slug == 'presidence';
 
   /// Nom du responsable actif (null si le poste est vacant).
   final String? responsable;
@@ -35,6 +41,7 @@ class DepartmentOverview {
   factory DepartmentOverview.fromJson(Map<String, dynamic> j) => DepartmentOverview(
         id: j['id'] as int,
         name: j['name'] as String,
+        slug: j['slug'] as String? ?? '',
         responsable: j['responsable'] as String?,
         membersActive: (j['members_active'] as num?)?.toInt() ?? 0,
         membersPending: (j['members_pending'] as num?)?.toInt() ?? 0,

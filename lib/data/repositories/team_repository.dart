@@ -51,4 +51,16 @@ class TeamRepository {
     });
     return Member.fromJson(data['data'] as Map<String, dynamic>);
   }
+
+  /// Supprime définitivement un compte (ses tâches et messages restent, signés « Ancien membre »).
+  Future<void> deleteMember(int userId) => _api.delete('/members/$userId');
+
+  /// Crée un département.
+  Future<void> createDepartment(String name) => _api.post('/admin/departments', {'name': name.trim()});
+
+  /// Renomme un département.
+  Future<void> renameDepartment(int id, String name) => _api.patch('/admin/departments/$id', {'name': name.trim()});
+
+  /// Supprime un département vide (ses tâches et son groupe de discussion sont supprimés avec lui).
+  Future<void> deleteDepartment(int id) => _api.delete('/admin/departments/$id');
 }

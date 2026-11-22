@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/notifications/push_notification_service.dart';
 import '../data/models/user.dart';
 import 'core_providers.dart';
+import 'data_providers.dart';
 
 /// État d'authentification de l'application.
 enum AuthStatus { unknown, signedOut, signedIn }
@@ -81,6 +82,21 @@ class AuthController extends Notifier<AuthState> {
     state = AuthState(AuthStatus.signedIn, user);
   }
 
+  /// Remet l'application « à neuf » pour le prochain utilisateur :
+  ///  - on revient sur l'onglet « Reçues » (et non sur le Profil, d'où l'on s'est déconnecté) ;
+  ///  - on oublie les listes, pastilles, messages et filtres de la personne précédente.
+  void _resetSession() {
+    ref.invalidate(homeSectionProvider);
+    ref.invalidate(teamTabProvider);
+    ref.invalidate(memberDepartmentFilterProvider);
+    ref.invalidate(countersProvider);
+    ref.invalidate(taskListProvider);
+    ref.invalidate(conversationsProvider);
+    ref.invalidate(approvalsProvider);
+    ref.invalidate(membersProvider);
+    ref.invalidate(departmentsOverviewProvider);
+  }
+
   Future<void> signOut({bool remote = true}) async {
     final repo = ref.read(authRepositoryProvider);
     if (remote) {
@@ -90,6 +106,7 @@ class AuthController extends Notifier<AuthState> {
     }
     ref.read(tokenHolderProvider).token = null;
     unawaited(ref.read(socialAuthProvider).signOut());
+    _resetSession();
     state = const AuthState(AuthStatus.signedOut);
   }
 }
