@@ -4,9 +4,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../core/network/api_client.dart';
 import '../core/storage/cache_storage.dart';
 import '../core/storage/secure_storage.dart';
+import '../core/auth/social_auth_service.dart';
 import '../data/repositories/auth_repository.dart';
+import '../data/repositories/chat_repository.dart';
 import '../data/repositories/meta_repository.dart';
 import '../data/repositories/task_repository.dart';
+import '../data/repositories/team_repository.dart';
 
 /// Instance de SharedPreferences, injectée dans main() (ProviderScope.overrides).
 final sharedPreferencesProvider = Provider<SharedPreferences>(
@@ -42,3 +45,11 @@ final metaRepositoryProvider =
 
 final taskRepositoryProvider =
     Provider<TaskRepository>((ref) => TaskRepository(ref.watch(apiClientProvider), ref.watch(cacheStorageProvider)));
+
+final chatRepositoryProvider =
+    Provider<ChatRepository>((ref) => ChatRepository(ref.watch(apiClientProvider), ref.watch(cacheStorageProvider)));
+
+final teamRepositoryProvider = Provider<TeamRepository>((ref) => TeamRepository(ref.watch(apiClientProvider)));
+
+/// Connexion Google / GitHub (Firebase Authentication).
+final socialAuthProvider = Provider<SocialAuthService>((ref) => SocialAuthService());

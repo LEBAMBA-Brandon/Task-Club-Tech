@@ -39,15 +39,25 @@ class PushNotificationService {
   /// Appelé quand l'utilisateur touche une notification : identifiant de la tâche.
   void Function(int taskId)? onOpenTask;
 
-  /// Appelé à chaque notification reçue au premier plan (pour rafraîchir les listes).
-  void Function()? onMessage;
+  /// Toucher une notification de message : ouvre la conversation.
+  void Function(int conversationId)? onOpenConversation;
+
+  /// Toucher une notification de demande d'inscription : ouvre la page Équipe.
+  void Function()? onOpenApprovals;
+
+  /// Chaque message reçu app ouverte (visible ou silencieux) : scope + données,
+  /// pour rafraîchir en direct l'écran concerné (voir CountersController.onServerSignal).
+  void Function(String scope, Map<String, dynamic> data)? onSignal;
+
+  /// Conversation actuellement affichée : pas de bannière pour ses nouveaux messages.
+  int? activeConversationId;
 
   /// Initialise Firebase et les notifications locales. Renvoie false si Firebase n'est pas configuré.
   Future<bool> init() async {
     if (_ready) return true;
     if (defaultTargetPlatform != TargetPlatform.android) return false;
     try {
-      await Firebase.initializeApp();
+      if (Firebase.apps.isEmpty) await Firebase.initializeApp();
     } catch (e) {
       debugPrint('Firebase non configuré (google-services.json absent) : $e');
       return false;
@@ -63,10 +73,25 @@ class PushNotificationService {
         .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
         ?.createNotificationChannel(_channel);
 
-    // Notification reçue application ouverte : on l'affiche nous-mêmes.
+    // Message reçu application ouverte.
     FirebaseMessaging.onMessage.listen((message) {
+      final data = message.data;
+      final type = data['type'] as String?;
+
+      // 1) Mise à jour en direct de l'écran concerné.
+      final scope = switch (type) {
+        'sync' => data['scope'] as String? ?? 'tasks',
+        'task_created' => 'tasks',
+        'approval_request' => 'approvals',
+        'chat_message' => 'chat',
+        _ => 'tasks',
+      };
+      onSignal?.call(scope, data);
+
+      // 2) Bannière (sauf signal silencieux, ou message de la conversation ouverte).
       final notification = message.notification;
-      if (notification != null) {
+      final inOpenChat = type == 'chat_message' && '${data['conversation_id']}' == '$activeConversationId';
+      if (notification != null && !inOpenChat) {
         _local.show(
           message.hashCode,
           notification.title,
@@ -81,18 +106,17 @@ class PushNotificationService {
               icon: '@mipmap/ic_launcher',
             ),
           ),
-          payload: message.data['task_id'],
+          payload: _payload(data),
         );
       }
       _acknowledge(message);
-      onMessage?.call();
     });
 
     // Clic sur une notification (appli en arrière-plan ou fermée).
-    FirebaseMessaging.onMessageOpenedApp.listen((m) => _openFromPayload(m.data['task_id']));
+    FirebaseMessaging.onMessageOpenedApp.listen((m) => _openFromPayload(_payload(m.data)));
     final initial = await FirebaseMessaging.instance.getInitialMessage();
     if (initial != null) {
-      scheduleMicrotask(() => _openFromPayload(initial.data['task_id']));
+      scheduleMicrotask(() => _openFromPayload(_payload(initial.data)));
     }
 
     _ready = true;
@@ -125,15 +149,34 @@ class PushNotificationService {
 
   /// Accusé « reçu » dès l'arrivée de la notification.
   void _acknowledge(RemoteMessage message) {
-    final id = int.tryParse(message.data['task_id'] ?? '');
+    if (message.data['type'] != 'task_created') return;
+    final id = int.tryParse('${message.data['task_id'] ?? ''}');
     if (id != null) {
       unawaited(_ref.read(taskRepositoryProvider).markDelivered([id]).catchError((_) {}));
     }
   }
 
+  /// Encode la destination d'une notification : « task:12 », « chat:3 », « approvals ».
+  String? _payload(Map<String, dynamic> data) => switch (data['type']) {
+        'task_created' => 'task:${data['task_id']}',
+        'chat_message' => 'chat:${data['conversation_id']}',
+        'approval_request' => 'approvals',
+        _ => null,
+      };
+
+  /// Ouvre l'écran correspondant à une notification touchée.
   void _openFromPayload(String? payload) {
-    final id = int.tryParse(payload ?? '');
-    if (id != null) onOpenTask?.call(id);
+    if (payload == null) return;
+    final parts = payload.split(':');
+    final id = parts.length > 1 ? int.tryParse(parts[1]) : null;
+    switch (parts.first) {
+      case 'task' when id != null:
+        onOpenTask?.call(id);
+      case 'chat' when id != null:
+        onOpenConversation?.call(id);
+      case 'approvals':
+        onOpenApprovals?.call();
+    }
   }
 }
 

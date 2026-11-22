@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
@@ -148,4 +150,37 @@ void showError(BuildContext context, Object error) {
   ScaffoldMessenger.of(context).showSnackBar(
     SnackBar(backgroundColor: AppColors.error, content: Text(error.toString())),
   );
+}
+
+/// Rafraîchit automatiquement un écran à intervalle régulier tant qu'il est affiché
+/// (filet de sécurité du « temps réel » quand aucun signal Firebase n'arrive,
+/// par exemple sur ordinateur). Le rechargement est silencieux.
+class AutoRefresh extends StatefulWidget {
+  const AutoRefresh({super.key, required this.every, required this.onTick, required this.child});
+
+  final Duration every;
+  final VoidCallback onTick;
+  final Widget child;
+
+  @override
+  State<AutoRefresh> createState() => _AutoRefreshState();
+}
+
+class _AutoRefreshState extends State<AutoRefresh> {
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(widget.every, (_) => widget.onTick());
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }

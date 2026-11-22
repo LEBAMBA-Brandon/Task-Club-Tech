@@ -62,6 +62,12 @@ class _TutorialScreenState extends ConsumerState<TutorialScreen> {
       _CreateIllustration(),
     ),
     const _Slide(
+      'Discutez entre membres',
+      'L\'onglet « Messages » contient le groupe de votre département et vos conversations privées. '
+          'Touchez « Nouveau message » pour écrire à n\'importe quel membre du club.',
+      _ChatIllustration(),
+    ),
+    const _Slide(
       'Votre profil',
       'Changez votre mot de passe, gérez les notifications et le thème clair ou sombre, retrouvez l\'aide '
           'et ce tutoriel dans l\'onglet « Profil ».',
@@ -331,6 +337,45 @@ class _CreateIllustration extends StatelessWidget {
           color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05),
         ),
         child: Row(children: [Icon(icon, size: 18), const SizedBox(width: 8), Text(text)]),
+      );
+}
+
+class _ChatIllustration extends StatelessWidget {
+  const _ChatIllustration();
+
+  @override
+  Widget build(BuildContext context) => _Frame(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.07),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: const Text('Qui s\'occupe des badges ?'),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerRight,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(colors: [AppColors.violet, AppColors.blue]),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: const Text('Moi, c\'est prêt demain 👍', style: TextStyle(color: Colors.white)),
+            ),
+          ),
+          const SizedBox(height: 12),
+          const Row(children: [
+            Badge(label: Text('3'), child: Icon(Icons.chat_bubble_rounded, color: AppColors.violet)),
+            SizedBox(width: 12),
+            Text('Messages', style: TextStyle(fontWeight: FontWeight.w700)),
+          ]),
+        ]),
       );
 }
 

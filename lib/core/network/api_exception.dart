@@ -2,7 +2,8 @@ import 'package:dio/dio.dart';
 
 /// Erreur unique remontée par la couche réseau, prête à être affichée.
 class ApiException implements Exception {
-  ApiException(this.message, {this.statusCode, this.code, this.fieldErrors = const {}, this.isOffline = false});
+  ApiException(this.message,
+      {this.statusCode, this.code, this.fieldErrors = const {}, this.isOffline = false, this.data = const {}});
 
   /// Message lisible pour l'utilisateur.
   final String message;
@@ -10,6 +11,9 @@ class ApiException implements Exception {
 
   /// Code métier renvoyé par l'API (EMAIL_NOT_VERIFIED, ACCOUNT_PENDING, ...).
   final String? code;
+
+  /// Données complémentaires (ex. nom pré-rempli pour PROFILE_REQUIRED).
+  final Map<String, dynamic> data;
 
   /// Erreurs de validation par champ (HTTP 422).
   final Map<String, String> fieldErrors;
@@ -34,11 +38,13 @@ class ApiException implements Exception {
     final status = response?.statusCode;
     var message = 'Une erreur est survenue ($status).';
     String? code;
+    var extra = <String, dynamic>{};
     final fields = <String, String>{};
 
     if (data is Map) {
       if (data['message'] is String) message = data['message'] as String;
       if (data['code'] is String) code = data['code'] as String;
+      if (data['data'] is Map) extra = Map<String, dynamic>.from(data['data'] as Map);
       final errors = data['errors'];
       if (errors is Map) {
         errors.forEach((key, value) {
@@ -50,7 +56,7 @@ class ApiException implements Exception {
     if (status == 429) message = 'Trop de tentatives. Patientez une minute.';
     if (status != null && status >= 500) message = 'Erreur du serveur. Réessayez plus tard.';
 
-    return ApiException(message, statusCode: status, code: code, fieldErrors: fields);
+    return ApiException(message, statusCode: status, code: code, fieldErrors: fields, data: extra);
   }
 
   @override

@@ -1,18 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../data/models/chat.dart';
 import '../data/models/comment.dart';
+import '../data/models/member.dart';
 import '../data/models/meta.dart';
 import '../data/models/task.dart';
 import '../data/models/user.dart';
 import '../data/repositories/task_repository.dart';
 import 'core_providers.dart';
+import 'realtime_provider.dart';
+
+export 'realtime_provider.dart' show countersProvider, CountersController;
 
 /// Référentiel (départements, postes, urgences).
 final metaProvider = FutureProvider<Meta>((ref) => ref.watch(metaRepositoryProvider).fetch());
 
 /// Liste de tâches pour un filtre donné (reçues / envoyées / toutes).
-final taskListProvider = FutureProvider.autoDispose.family<TaskPage, TaskQuery>(
+/// Pas d'autoDispose : la liste reste en mémoire quand on change d'onglet,
+/// et les mises à jour se font en silence (l'ancienne liste reste affichée pendant le rechargement).
+final taskListProvider = FutureProvider.family<TaskPage, TaskQuery>(
   (ref, query) => ref.watch(taskRepositoryProvider).list(query),
 );
 
@@ -26,22 +33,37 @@ final commentsProvider = FutureProvider.autoDispose.family<List<Comment>, int>(
   (ref, id) => ref.watch(taskRepositoryProvider).comments(id),
 );
 
-/// Nombre de tâches reçues non lues (badge).
-final unreadCountProvider = FutureProvider.autoDispose<int>((ref) => ref.watch(taskRepositoryProvider).unreadCount());
-
 /// Comptes en attente de validation.
-final approvalsProvider = FutureProvider.autoDispose<List<AppUser>>(
+final approvalsProvider = FutureProvider<List<AppUser>>(
   (ref) => ref.watch(taskRepositoryProvider).pendingApprovals(),
+);
+
+/// Conversations de la messagerie.
+final conversationsProvider = FutureProvider<List<Conversation>>(
+  (ref) => ref.watch(chatRepositoryProvider).conversations(),
+);
+
+/// Filtre de la page de suivi des membres : (département, recherche).
+typedef MemberQuery = ({int? departmentId, String? search});
+
+/// Membres suivis (président/VP : tout le club ; responsable : son département).
+final membersProvider = FutureProvider.family<List<Member>, MemberQuery>(
+  (ref, q) => ref.watch(teamRepositoryProvider).members(departmentId: q.departmentId, search: q.search),
+);
+
+/// Annuaire (pour démarrer une conversation).
+final directoryProvider = FutureProvider.autoDispose.family<List<AppUser>, String>(
+  (ref, search) => ref.watch(teamRepositoryProvider).directory(search: search),
 );
 
 /// Rafraîchit toutes les listes de tâches (après création, notification...).
 void refreshTaskLists(WidgetRef ref) {
   ref.invalidate(taskListProvider);
-  ref.invalidate(unreadCountProvider);
+  ref.read(countersProvider.notifier).refresh();
 }
 
 /// Section affichée dans la navigation principale :
-/// received | sent | all | approvals | profile
+/// received | sent | chat | team | profile
 class HomeSectionController extends Notifier<String> {
   @override
   String build() => 'received';
@@ -50,6 +72,16 @@ class HomeSectionController extends Notifier<String> {
 }
 
 final homeSectionProvider = NotifierProvider<HomeSectionController, String>(HomeSectionController.new);
+
+/// Onglet ouvert dans la page Équipe : 0 = Membres, 1 = Demandes.
+class TeamTabController extends Notifier<int> {
+  @override
+  int build() => 0;
+
+  void show(int tab) => state = tab;
+}
+
+final teamTabProvider = NotifierProvider<TeamTabController, int>(TeamTabController.new);
 
 /// Préférences simples enregistrées sur l'appareil (notifications, tutoriel déjà vu).
 class DevicePrefs {

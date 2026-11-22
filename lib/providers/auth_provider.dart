@@ -52,6 +52,29 @@ class AuthController extends Notifier<AuthState> {
     unawaited(ref.read(pushNotificationServiceProvider).registerDevice());
   }
 
+  /// Connexion Google / GitHub : [idToken] Firebase + profil (seulement pour un nouveau compte).
+  /// Les erreurs (PROFILE_REQUIRED, ACCOUNT_PENDING...) remontent à l'écran sous forme d'ApiException.
+  Future<void> signInSocial(
+    String idToken, {
+    String? firstName,
+    String? lastName,
+    int? departmentId,
+    String? position,
+    bool? acceptTerms,
+  }) async {
+    final session = await ref.read(authRepositoryProvider).social(
+          idToken,
+          firstName: firstName,
+          lastName: lastName,
+          departmentId: departmentId,
+          position: position,
+          acceptTerms: acceptTerms,
+        );
+    ref.read(tokenHolderProvider).token = session.token;
+    state = AuthState(AuthStatus.signedIn, session.user);
+    unawaited(ref.read(pushNotificationServiceProvider).registerDevice());
+  }
+
   /// Recharge le profil (après validation d'un compte, par exemple).
   Future<void> refreshUser() async {
     final user = await ref.read(authRepositoryProvider).me();
@@ -66,6 +89,7 @@ class AuthController extends Notifier<AuthState> {
       await repo.clearLocal();
     }
     ref.read(tokenHolderProvider).token = null;
+    unawaited(ref.read(socialAuthProvider).signOut());
     state = const AuthState(AuthStatus.signedOut);
   }
 }

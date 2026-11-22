@@ -38,9 +38,13 @@ class _TaskListScreenState extends ConsumerState<TaskListScreen> {
         onState: (v) => setState(() => _state = v),
       ),
       Expanded(
-        child: RefreshIndicator(
+        child: AutoRefresh(
+          // Liste à jour toutes les 20 s (en plus des signaux Firebase instantanés).
+          every: const Duration(seconds: 20),
+          onTick: () => ref.invalidate(taskListProvider(_query)),
+          child: RefreshIndicator(
           onRefresh: () async {
-            ref.invalidate(unreadCountProvider);
+            ref.read(countersProvider.notifier).refresh();
             ref.invalidate(taskListProvider(_query));
             await ref.read(taskListProvider(_query).future);
           },
@@ -57,6 +61,7 @@ class _TaskListScreenState extends ConsumerState<TaskListScreen> {
             ]),
             data: (page) => _list(page),
           ),
+        ),
         ),
       ),
     ]);

@@ -63,6 +63,8 @@ class _ApprovalTileState extends ConsumerState<_ApprovalTile> {
       final repo = ref.read(taskRepositoryProvider);
       approve ? await repo.approve(widget.user.id) : await repo.reject(widget.user.id);
       ref.invalidate(approvalsProvider);
+      ref.invalidate(membersProvider);
+      ref.read(countersProvider.notifier).refresh();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(approve ? '${widget.user.fullName} peut maintenant se connecter.' : 'Demande refusée.'),

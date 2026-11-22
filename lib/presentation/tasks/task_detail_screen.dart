@@ -46,13 +46,21 @@ class TaskDetailScreen extends ConsumerWidget {
           action: 'Réessayer',
           onAction: () => ref.invalidate(taskDetailProvider(taskId)),
         ),
-        data: (task) => RefreshIndicator(
+        data: (task) => AutoRefresh(
+          // Coches et commentaires à jour toutes les 10 s, sans rien toucher.
+          every: const Duration(seconds: 10),
+          onTick: () {
+            ref.invalidate(taskDetailProvider(taskId));
+            ref.invalidate(commentsProvider(taskId));
+          },
+          child: RefreshIndicator(
           onRefresh: () async {
             ref.invalidate(commentsProvider(taskId));
             ref.invalidate(taskDetailProvider(taskId));
             await ref.read(taskDetailProvider(taskId).future);
           },
           child: _Body(task: task),
+        ),
         ),
       ),
     );

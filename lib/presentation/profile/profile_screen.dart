@@ -80,7 +80,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   Widget build(BuildContext context) {
     final user = ref.watch(currentUserProvider);
     final themeMode = ref.watch(themeModeProvider);
-    final unread = ref.watch(unreadCountProvider).asData?.value ?? 0;
+    final counters = ref.watch(countersProvider);
+    final unread = counters.tasksUnread;
     if (user == null) return const SizedBox.shrink();
     final muted = Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.55);
 
@@ -118,10 +119,31 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             onTap: () => _goTo('received'),
           ),
           _Item(icon: Icons.outbox_rounded, label: 'Tâches envoyées', onTap: () => _goTo('sent')),
-          if (user.isPresidency)
-            _Item(icon: Icons.groups_rounded, label: 'Toutes les tâches du club', onTap: () => _goTo('all')),
-          if (user.canApprove)
-            _Item(icon: Icons.how_to_reg, label: 'Comptes à valider', onTap: () => _goTo('approvals')),
+          _Item(
+            icon: Icons.chat_bubble_rounded,
+            label: 'Messages',
+            trailing: counters.messagesUnread > 0 ? Badge(label: Text('${counters.messagesUnread}')) : null,
+            onTap: () => _goTo('chat'),
+          ),
+          if (user.canApprove) ...[
+            _Item(
+              icon: Icons.groups_rounded,
+              label: user.isPresidency ? 'Suivi des membres du club' : 'Suivi des membres du département',
+              onTap: () {
+                ref.read(teamTabProvider.notifier).show(0);
+                _goTo('team');
+              },
+            ),
+            _Item(
+              icon: Icons.how_to_reg,
+              label: 'Demandes d\'inscription',
+              trailing: counters.approvalsPending > 0 ? Badge(label: Text('${counters.approvalsPending}')) : null,
+              onTap: () {
+                ref.read(teamTabProvider.notifier).show(1);
+                _goTo('team');
+              },
+            ),
+          ],
           _Item(icon: Icons.add_task_rounded, label: 'Nouvelle tâche', onTap: () => _open(const CreateTaskScreen())),
         ]),
 

@@ -39,6 +39,12 @@ class LegalTexts {
     ('Qui peut les voir',
         'Les membres concernés par une tâche voient le nom et le poste de son auteur. L\'auteur et la présidence '
             'voient les accusés des destinataires. Vos données ne sont jamais vendues ni partagées hors du club.'),
+    ('Messagerie',
+        'Les messages privés ne sont visibles que par les deux membres concernés ; ceux du groupe d\'un '
+            'département, par ses membres. Restez courtois : le bureau peut suspendre un compte en cas d\'abus.'),
+    ('Connexion Google / GitHub',
+        'Si vous choisissez cette option, l\'application reçoit seulement votre nom et votre adresse e-mail. '
+            'Elle n\'a jamais accès à votre mot de passe Google ou GitHub.'),
     ('Notifications',
         'Si vous les activez, un identifiant technique de votre téléphone est enregistré pour vous envoyer les '
             'nouvelles tâches. Vous pouvez les désactiver à tout moment dans Profil › Compte › Notifications.'),
@@ -67,6 +73,15 @@ class LegalTexts {
         '✓ gris : envoyée · ✓✓ gris : reçue · ✓✓ bleu : vue · ✔ vert : effectuée.'),
     ('Que veulent dire les couleurs ?',
         'Vert : flexible · Bleu : normale · Jaune : importante · Rouge : urgente.'),
+    ('Comment écrire à un membre ?',
+        'Onglet « Messages » › « Nouveau message », puis cherchez son nom. Le groupe de votre département '
+            'est déjà dans la liste.'),
+    ('Puis-je m\'inscrire avec Google ?',
+        'Oui : sur l\'écran d\'accueil, touchez « Google » ou « GitHub ». Il restera à choisir votre département '
+            'et votre poste, puis à attendre la validation du bureau.'),
+    ('Les informations se mettent-elles à jour toutes seules ?',
+        'Oui : les nouvelles tâches, coches, messages et demandes apparaissent automatiquement, sans recharger. '
+            'Il faut simplement une connexion internet.'),
     ('Je ne reçois pas de notifications',
         'Vérifiez Profil › Compte › Notifications, puis les réglages de notifications de votre téléphone '
             'pour C-Tech Tasks.'),

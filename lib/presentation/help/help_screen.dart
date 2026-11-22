@@ -24,7 +24,7 @@ class HelpScreen extends StatelessWidget {
                 child: Icon(Icons.play_lesson_rounded, color: Colors.white),
               ),
               title: const Text('Revoir le tutoriel', style: TextStyle(fontWeight: FontWeight.w700)),
-              subtitle: const Text('Les bases de l\'application en 7 écrans'),
+              subtitle: const Text('Les bases de l\'application en 8 écrans'),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute<void>(fullscreenDialog: true, builder: (_) => const TutorialScreen()),

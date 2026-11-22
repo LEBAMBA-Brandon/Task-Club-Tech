@@ -12,9 +12,10 @@ import '../../../providers/data_providers.dart';
 import '../../help/legal_screen.dart';
 import 'auth_widgets.dart';
 import 'code_input.dart';
+import 'social_buttons.dart';
 
 /// Écrans possibles de la carte.
-enum AuthMode { signIn, signUp, verifyEmail, forgot, reset, pending }
+enum AuthMode { signIn, signUp, verifyEmail, forgot, reset, pending, socialProfile }
 
 /// Carte « YOUR SPACE » de la maquette, adaptée à C-Tech :
 /// connexion, inscription, code e-mail (double authentification),
@@ -36,17 +37,30 @@ class _AuthCardState extends ConsumerState<AuthCard> {
   AuthMode _mode = AuthMode.signIn;
   String _email = '';
 
+  /// Inscription Google / GitHub en cours : jeton Firebase + nom pré-rempli.
+  String? _socialToken;
+  Map<String, dynamic> _socialData = const {};
+
   void _go(AuthMode mode, {String? email}) => setState(() {
         _mode = mode;
         if (email != null) _email = email;
       });
 
-  /// En développement (pas de SMTP), l'API renvoie le code : on l'affiche.
-  void _showDebugCode(CodeSent sent) {
-    if (sent.debugCode == null) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Mode développement — code : ${sent.debugCode}'), duration: const Duration(seconds: 12)),
-    );
+  /// Nouveau compte Google / GitHub : il reste à choisir le département et le poste.
+  void _completeSocialProfile(String idToken, Map<String, dynamic> data) => setState(() {
+        _socialToken = idToken;
+        _socialData = data;
+        _email = '${data['email'] ?? ''}';
+        _mode = AuthMode.socialProfile;
+      });
+
+  /// Le code part uniquement par e-mail : on rappelle juste où le chercher
+  /// (il n'est jamais affiché dans l'application).
+  void _onCodeSent(CodeSent sent) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text('${sent.message} Pensez à regarder dans les courriers indésirables.'),
+      duration: const Duration(seconds: 6),
+    ));
   }
 
   @override
@@ -58,6 +72,7 @@ class _AuthCardState extends ConsumerState<AuthCard> {
       AuthMode.forgot => ('Mot de passe oublié', 'Recevez un code par e-mail'),
       AuthMode.reset => ('Nouveau mot de passe', 'Code envoyé à $_email'),
       AuthMode.pending => ('Presque prêt', 'Votre compte attend la validation'),
+      AuthMode.socialProfile => ('Dernière étape', 'Complétez votre profil ($_email)'),
     };
 
     return Theme(
@@ -114,13 +129,29 @@ class _AuthCardState extends ConsumerState<AuthCard> {
   }
 
   Widget _body() => switch (_mode) {
-        AuthMode.signIn => _SignInForm(accent: widget.accent, onNavigate: _go, onCodeSent: _showDebugCode),
-        AuthMode.signUp => _SignUpForm(accent: widget.accent, onNavigate: _go, onCodeSent: _showDebugCode),
+        AuthMode.signIn => _SignInForm(
+            accent: widget.accent,
+            onNavigate: _go,
+            onCodeSent: _onCodeSent,
+            onProfileRequired: _completeSocialProfile,
+          ),
+        AuthMode.signUp => _SignUpForm(
+            accent: widget.accent,
+            onNavigate: _go,
+            onCodeSent: _onCodeSent,
+            onProfileRequired: _completeSocialProfile,
+          ),
         AuthMode.verifyEmail =>
-          _VerifyForm(accent: widget.accent, email: _email, onNavigate: _go, onCodeSent: _showDebugCode),
-        AuthMode.forgot => _ForgotForm(accent: widget.accent, onNavigate: _go, onCodeSent: _showDebugCode),
+          _VerifyForm(accent: widget.accent, email: _email, onNavigate: _go, onCodeSent: _onCodeSent),
+        AuthMode.forgot => _ForgotForm(accent: widget.accent, onNavigate: _go, onCodeSent: _onCodeSent),
         AuthMode.reset => _ResetForm(accent: widget.accent, email: _email, onNavigate: _go),
         AuthMode.pending => _PendingView(accent: widget.accent, onNavigate: _go),
+        AuthMode.socialProfile => _SocialProfileForm(
+            accent: widget.accent,
+            idToken: _socialToken ?? '',
+            data: _socialData,
+            onNavigate: _go,
+          ),
       };
 }
 
@@ -158,7 +189,13 @@ class _Tabs extends StatelessWidget {
 // ============================================================== Connexion
 
 class _SignInForm extends ConsumerStatefulWidget {
-  const _SignInForm({required this.accent, required this.onNavigate, required this.onCodeSent});
+  const _SignInForm({
+    required this.accent,
+    required this.onNavigate,
+    required this.onCodeSent,
+    required this.onProfileRequired,
+  });
+  final void Function(String idToken, Map<String, dynamic> data) onProfileRequired;
   final Color accent;
   final _Navigate onNavigate;
   final void Function(CodeSent) onCodeSent;
@@ -254,6 +291,11 @@ class _SignInFormState extends ConsumerState<_SignInForm> {
           ]),
           const SizedBox(height: 18),
           AccentButton(label: 'Se connecter', color: widget.accent, loading: _loading, onPressed: _submit),
+          SocialButtons(
+            accent: widget.accent,
+            onProfileRequired: widget.onProfileRequired,
+            onPending: () => widget.onNavigate(AuthMode.pending),
+          ),
         ]),
       ),
     );
@@ -263,7 +305,13 @@ class _SignInFormState extends ConsumerState<_SignInForm> {
 // ============================================================== Inscription
 
 class _SignUpForm extends ConsumerStatefulWidget {
-  const _SignUpForm({required this.accent, required this.onNavigate, required this.onCodeSent});
+  const _SignUpForm({
+    required this.accent,
+    required this.onNavigate,
+    required this.onCodeSent,
+    required this.onProfileRequired,
+  });
+  final void Function(String idToken, Map<String, dynamic> data) onProfileRequired;
   final Color accent;
   final _Navigate onNavigate;
   final void Function(CodeSent) onCodeSent;
@@ -428,6 +476,11 @@ class _SignUpFormState extends ConsumerState<_SignUpForm> {
         ]),
         const SizedBox(height: 18),
         AccentButton(label: 'Créer le compte', color: widget.accent, loading: _loading, onPressed: _submit),
+        SocialButtons(
+          accent: widget.accent,
+          onProfileRequired: widget.onProfileRequired,
+          onPending: () => widget.onNavigate(AuthMode.pending),
+        ),
       ]),
     );
   }
@@ -725,5 +778,144 @@ class _PendingView extends StatelessWidget {
       const SizedBox(height: 20),
       AccentButton(label: 'Retour à la connexion', color: accent, onPressed: () => onNavigate(AuthMode.signIn)),
     ]);
+  }
+}
+
+// ============================================================== Profil après Google / GitHub
+
+/// Nouveau compte créé avec Google ou GitHub : l'adresse est déjà confirmée,
+/// il reste le nom, le département, le poste et les conditions d'utilisation.
+class _SocialProfileForm extends ConsumerStatefulWidget {
+  const _SocialProfileForm({
+    required this.accent,
+    required this.idToken,
+    required this.data,
+    required this.onNavigate,
+  });
+  final Color accent;
+  final String idToken;
+  final Map<String, dynamic> data;
+  final _Navigate onNavigate;
+
+  @override
+  ConsumerState<_SocialProfileForm> createState() => _SocialProfileFormState();
+}
+
+class _SocialProfileFormState extends ConsumerState<_SocialProfileForm> {
+  final _form = GlobalKey<FormState>();
+  late final _firstName = TextEditingController(text: '${widget.data['first_name'] ?? ''}');
+  late final _lastName = TextEditingController(text: '${widget.data['last_name'] ?? ''}');
+  int? _departmentId;
+  String? _position;
+  bool _acceptTerms = false;
+  bool _loading = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _firstName.dispose();
+    _lastName.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (!_form.currentState!.validate()) return;
+    if (!_acceptTerms) {
+      setState(() => _error = 'Vous devez accepter les conditions d\'utilisation.');
+      return;
+    }
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      await ref.read(authControllerProvider.notifier).signInSocial(
+            widget.idToken,
+            firstName: _firstName.text,
+            lastName: _lastName.text,
+            departmentId: _departmentId,
+            position: _position,
+            acceptTerms: true,
+          );
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      if (e.code == 'ACCOUNT_PENDING') {
+        widget.onNavigate(AuthMode.pending);
+      } else {
+        setState(() => _error = e.message);
+      }
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final meta = ref.watch(metaProvider);
+    return meta.when(
+      loading: () => const Padding(padding: EdgeInsets.all(30), child: Center(child: CircularProgressIndicator())),
+      error: (e, _) => AuthError('Impossible de charger les départements : $e'),
+      data: (meta) {
+        final positions = _departmentId == null ? const <Option>[] : (meta.positions[_departmentId] ?? const <Option>[]);
+        return Form(
+          key: _form,
+          child: Column(children: [
+            AuthError(_error),
+            AuthField(label: 'Nom', controller: _lastName, icon: Icons.badge_outlined, validator: Validators.required),
+            AuthField(label: 'Prénom', controller: _firstName, icon: Icons.badge_outlined, validator: Validators.required),
+            AuthDropdown<int>(
+              label: 'Département',
+              icon: Icons.apartment_outlined,
+              hint: 'Choisir un département',
+              value: _departmentId,
+              items: [for (final d in meta.departments) DropdownMenuItem(value: d.id, child: Text(d.name))],
+              validator: (v) => v == null ? 'Choisissez un département' : null,
+              onChanged: (v) => setState(() {
+                _departmentId = v;
+                _position = null;
+              }),
+            ),
+            AuthDropdown<String>(
+              label: 'Poste',
+              icon: Icons.workspace_premium_outlined,
+              hint: _departmentId == null ? 'Choisissez d\'abord un département' : 'Choisir un poste',
+              value: _position,
+              items: [for (final p in positions) DropdownMenuItem(value: p.value, child: Text(p.label))],
+              validator: (v) => v == null ? 'Choisissez un poste' : null,
+              onChanged: (v) => setState(() => _position = v),
+            ),
+            Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              SizedBox(
+                width: 24,
+                height: 24,
+                child: Checkbox(
+                  value: _acceptTerms,
+                  activeColor: widget.accent,
+                  side: const BorderSide(color: Colors.white38),
+                  onChanged: (v) => setState(() => _acceptTerms = v ?? false),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => LegalScreen.terms())),
+                  child: Text.rich(TextSpan(children: [
+                    const TextSpan(text: 'J\'accepte les ', style: TextStyle(color: Colors.white70, fontSize: 13)),
+                    TextSpan(
+                      text: 'conditions d\'utilisation',
+                      style: TextStyle(color: widget.accent, fontSize: 13, fontWeight: FontWeight.w700),
+                    ),
+                  ])),
+                ),
+              ),
+            ]),
+            const SizedBox(height: 18),
+            AccentButton(label: 'Terminer l\'inscription', color: widget.accent, loading: _loading, onPressed: _submit),
+            const SizedBox(height: 8),
+            TextButton(onPressed: () => widget.onNavigate(AuthMode.signIn), child: const Text('Annuler')),
+          ]),
+        );
+      },
+    );
   }
 }

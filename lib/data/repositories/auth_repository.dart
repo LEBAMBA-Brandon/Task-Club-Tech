@@ -91,6 +91,37 @@ class AuthRepository {
     return session;
   }
 
+  /// Connexion avec Google / GitHub : [idToken] vient de Firebase Authentication.
+  /// Pour un nouveau compte, l'API répond PROFILE_REQUIRED (ApiException) : on rappelle
+  /// alors cette méthode avec le département, le poste et l'acceptation des conditions.
+  Future<AuthSession> social(
+    String idToken, {
+    String? firstName,
+    String? lastName,
+    int? departmentId,
+    String? position,
+    bool? acceptTerms,
+  }) async {
+    final data = await _api.post('/auth/social', {
+      'id_token': idToken,
+      'device_name': 'android',
+      if (firstName != null) 'first_name': firstName.trim(),
+      if (lastName != null) 'last_name': lastName.trim(),
+      if (departmentId != null) 'department_id': departmentId,
+      if (position != null) 'position': position,
+      if (acceptTerms != null) 'accept_terms': acceptTerms,
+    });
+    final session = AuthSession(
+      token: data['token'] as String,
+      expiresAt: DateTime.parse(data['expires_at'] as String),
+      user: AppUser.fromJson(data['user'] as Map<String, dynamic>),
+    );
+    // La connexion sociale garde toujours la session (comme « Se souvenir de moi »).
+    await _secure.saveToken(session.token, session.expiresAt);
+    await _cache.write(_userCacheKey, session.user.toJson());
+    return session;
+  }
+
   Future<String?> readStoredToken() => _secure.readValidToken();
 
   /// Profil à jour ; en cas d'absence de réseau, renvoie le profil en cache.
