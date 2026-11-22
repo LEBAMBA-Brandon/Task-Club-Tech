@@ -4,18 +4,24 @@ import 'package:flutter/foundation.dart';
 /// Démarrage de Firebase (notifications + connexion Google).
 ///
 /// - Android : la configuration vient de android/app/google-services.json.
-/// - Web (version navigateur) : Firebase a besoin de la configuration de « l'application Web »
+/// - Web (version navigateur) : configuration de l'application Web « C-Tech Tasks Web »
 ///   déclarée dans la console Firebase (Paramètres du projet › Vos applications › Web).
-///   On la passe au lancement, sans l'écrire dans le code :
-///     flutter run -d chrome --dart-define=FIREBASE_WEB_API_KEY=... --dart-define=FIREBASE_WEB_APP_ID=...
-///   Sans ces valeurs, la version web fonctionne sans Google ni notifications.
+///   Ces valeurs sont publiques par conception (elles identifient le projet, ce ne sont pas
+///   des mots de passe) ; la sécurité repose sur les « domaines autorisés » de Firebase
+///   Authentication et sur la vérification du jeton par l'API.
+///   Elles peuvent être remplacées au lancement avec --dart-define=FIREBASE_WEB_API_KEY=... etc.
 class FirebaseSetup {
   FirebaseSetup._();
 
-  static const _webApiKey = String.fromEnvironment('FIREBASE_WEB_API_KEY');
-  static const _webAppId = String.fromEnvironment('FIREBASE_WEB_APP_ID');
-  static const _projectId = String.fromEnvironment('FIREBASE_PROJECT_ID', defaultValue: 'tasks-ctech');
-  static const _senderId = String.fromEnvironment('FIREBASE_SENDER_ID');
+  static const _webApiKey =
+      String.fromEnvironment('FIREBASE_WEB_API_KEY', defaultValue: 'AIzaSyBTpWjnWAcA48zyn7jgWvJbqeUS4DqT1OY');
+  static const _webAppId =
+      String.fromEnvironment('FIREBASE_WEB_APP_ID', defaultValue: '1:755413969568:web:53bebe56025735f096f7c5');
+  static const _measurementId = 'G-0GVP79KY9Q';
+  static const _storageBucket = 'task-ctech.firebasestorage.app';
+  // Identifiants publics du projet Firebase « task-ctech » (lus dans google-services.json).
+  static const _projectId = String.fromEnvironment('FIREBASE_PROJECT_ID', defaultValue: 'task-ctech');
+  static const _senderId = String.fromEnvironment('FIREBASE_SENDER_ID', defaultValue: '755413969568');
 
   /// Vrai si Firebase a pu démarrer sur cette plateforme.
   static bool ready = false;
@@ -39,6 +45,8 @@ class FirebaseSetup {
             messagingSenderId: _senderId,
             projectId: _projectId,
             authDomain: '$_projectId.firebaseapp.com',
+            storageBucket: _storageBucket,
+            measurementId: _measurementId,
           ),
         );
         ready = true;
