@@ -42,6 +42,10 @@ class ApprovalService
             'approved_at' => now(),
         ])->save();
 
+        // E-mail « votre compte est validé » + mise à jour en direct chez les autres validateurs.
+        dispatch(fn () => app(NotificationService::class)->accountApproved($candidate))->afterResponse();
+        dispatch(fn () => app(NotificationService::class)->approvalDecided($candidate, $approver->id))->afterResponse();
+
         return $candidate;
     }
 
@@ -54,6 +58,7 @@ class ApprovalService
             'approved_by' => $approver->id,
             'approved_at' => now(),
         ])->save();
+        dispatch(fn () => app(NotificationService::class)->approvalDecided($candidate, $approver->id))->afterResponse();
 
         return $candidate;
     }

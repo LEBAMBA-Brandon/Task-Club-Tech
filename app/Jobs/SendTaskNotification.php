@@ -3,7 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\Task;
-use App\Services\FirebaseMessagingService;
+use App\Services\NotificationService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Foundation\Bus\Dispatchable;
 
@@ -16,22 +16,11 @@ class SendTaskNotification
 
     public function __construct(public int $taskId) {}
 
-    public function handle(FirebaseMessagingService $firebase): void
+    public function handle(NotificationService $notifications): void
     {
-        $task = Task::with(['creator', 'recipients.user'])->find($this->taskId);
-        if (! $task) {
-            return;
-        }
-
-        $title = 'Nouvelle tâche ('.$task->urgency->label().')';
-        $body = $task->creator->fullName().' : '.$task->title;
-
-        foreach ($task->recipients as $recipient) {
-            $firebase->sendToUser($recipient->user, $title, $body, [
-                'type' => 'task_created',
-                'task_id' => (string) $task->id,
-                'urgency' => $task->urgency->value,
-            ]);
+        $task = Task::find($this->taskId);
+        if ($task) {
+            $notifications->taskCreated($task);
         }
     }
 }

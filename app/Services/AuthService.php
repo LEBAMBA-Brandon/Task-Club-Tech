@@ -8,6 +8,7 @@ use App\Enums\UserStatus;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -59,6 +60,9 @@ class AuthService
             'status' => UserStatus::PendingApproval,
         ])->save();
 
+        // Prévient le président, le vice-président et le responsable concerné (après la réponse).
+        dispatch(fn () => app(NotificationService::class)->approvalRequested($user))->afterResponse();
+
         return $user;
     }
 
@@ -88,8 +92,63 @@ class AuthService
             throw ValidationException::withMessages(['email' => 'Identifiants incorrects.']);
         }
 
+        return $this->openSession($user, $deviceName);
+    }
+
+    /**
+     * Connexion / inscription avec Google ou GitHub (via Firebase Authentication).
+     *
+     *  - Compte existant : même contrôle que la connexion classique, puis jeton.
+     *  - Nouveau compte : il faut le département, le poste et l'acceptation des conditions.
+     *    S'ils manquent -> PROFILE_REQUIRED (409) avec le nom/prénom pré-remplis.
+     *    Sinon le compte est créé « en attente de validation » : pas de code e-mail,
+     *    Google / GitHub ont déjà confirmé l'adresse.
+     *
+     * @param  array{id_token:string, first_name?:string, last_name?:string, department_id?:int, position?:string, accept_terms?:bool, device_name?:string}  $data
+     */
+    public function social(array $data, FirebaseTokenVerifier $verifier): array
+    {
+        $identity = $verifier->verify($data['id_token']);
+        $user = User::where('email', $identity['email'])->first();
+
+        if (! $user) {
+            [$first, $last] = $this->splitName($identity['name'], $identity['email']);
+            if (empty($data['department_id']) || empty($data['position']) || empty($data['accept_terms'])) {
+                throw new AccountStateException('PROFILE_REQUIRED', 'Complétez votre profil pour terminer l\'inscription.', [
+                    'email' => $identity['email'],
+                    'first_name' => $first,
+                    'last_name' => $last,
+                    'provider' => $identity['provider'],
+                ], 409);
+            }
+
+            $user = User::create([
+                'first_name' => $data['first_name'] ?? $first,
+                'last_name' => $data['last_name'] ?? $last,
+                'email' => $identity['email'],
+                // Mot de passe aléatoire : le membre peut en définir un via « mot de passe oublié ».
+                'password' => Str::password(32),
+                'department_id' => $data['department_id'],
+                'position' => Position::from($data['position']),
+                'status' => UserStatus::PendingApproval,
+                'terms_accepted_at' => now(),
+            ]);
+            $user->forceFill(['email_verified_at' => now()])->save();
+            dispatch(fn () => app(NotificationService::class)->approvalRequested($user))->afterResponse();
+        } elseif ($user->status === UserStatus::PendingVerification) {
+            // Inscrit par e-mail mais jamais confirmé : Google / GitHub confirment l'adresse.
+            $user->forceFill(['email_verified_at' => now(), 'status' => UserStatus::PendingApproval])->save();
+            dispatch(fn () => app(NotificationService::class)->approvalRequested($user))->afterResponse();
+        }
+
+        return $this->openSession($user, $data['device_name'] ?? 'android');
+    }
+
+    /** Vérifie que le compte peut se connecter, puis crée un jeton de 7 semaines. */
+    private function openSession(User $user, string $deviceName): array
+    {
         match ($user->status) {
-            UserStatus::PendingVerification => throw new AccountStateException('EMAIL_NOT_VERIFIED', 'Adresse e-mail non confirmée. Saisissez le code reçu par e-mail.'),
+            UserStatus::PendingVerification => throw new AccountStateException('EMAIL_NOT_VERIFIED', 'Adresse e-mail non confirmée. Saisissez le code reçu par e-mail.', ['email' => $user->email]),
             UserStatus::PendingApproval => throw new AccountStateException('ACCOUNT_PENDING', 'Votre compte attend la validation du bureau.'),
             UserStatus::Rejected => throw new AccountStateException('ACCOUNT_REJECTED', 'Votre demande d\'inscription a été refusée.'),
             UserStatus::Suspended => throw new AccountStateException('ACCOUNT_SUSPENDED', 'Votre compte est suspendu.'),
@@ -100,6 +159,19 @@ class AuthService
         $token = $user->createToken(mb_substr($deviceName, 0, 100), ['*'], $expiresAt)->plainTextToken;
 
         return ['user' => $user, 'token' => $token, 'expires_at' => $expiresAt];
+    }
+
+    /** « Axel Romain Assoume » -> ['Axel Romain', 'Assoume'] ; sans nom : partie avant @ de l'e-mail. */
+    private function splitName(?string $name, string $email): array
+    {
+        $name = trim((string) $name);
+        if ($name === '') {
+            return [ucfirst(strtok($email, '@')), ''];
+        }
+        $parts = preg_split('/\s+/', $name);
+        $last = count($parts) > 1 ? array_pop($parts) : '';
+
+        return [implode(' ', $parts), $last];
     }
 
     /** Envoie un code de réinitialisation si le compte existe (réponse toujours identique). */

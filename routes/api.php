@@ -2,8 +2,11 @@
 
 use App\Http\Controllers\Api\V1\ApprovalController;
 use App\Http\Controllers\Api\V1\AuthController;
+use App\Http\Controllers\Api\V1\ChatController;
 use App\Http\Controllers\Api\V1\CommentController;
+use App\Http\Controllers\Api\V1\CounterController;
 use App\Http\Controllers\Api\V1\DepartmentController;
+use App\Http\Controllers\Api\V1\MemberController;
 use App\Http\Controllers\Api\V1\MetaController;
 use App\Http\Controllers\Api\V1\TaskController;
 use Illuminate\Support\Facades\Route;
@@ -25,6 +28,7 @@ Route::prefix('v1')->group(function () {
         Route::post('verify-email', [AuthController::class, 'verifyEmail']);
         Route::post('resend-code', [AuthController::class, 'resendCode']);
         Route::post('login', [AuthController::class, 'login']);
+        Route::post('social', [AuthController::class, 'social']);
         Route::post('forgot-password', [AuthController::class, 'forgotPassword']);
         Route::post('reset-password', [AuthController::class, 'resetPassword']);
     });
@@ -48,6 +52,20 @@ Route::prefix('v1')->group(function () {
         Route::delete('tasks/{task}/done', [TaskController::class, 'unmarkDone']);
         Route::get('tasks/{task}/comments', [CommentController::class, 'index']);
         Route::post('tasks/{task}/comments', [CommentController::class, 'store']);
+
+        // Pastilles (tâches non lues, demandes en attente, messages non lus)
+        Route::get('counters', CounterController::class);
+
+        // Suivi des membres + annuaire
+        Route::get('members', [MemberController::class, 'index']);
+        Route::get('directory', [MemberController::class, 'directory']);
+
+        // Messagerie
+        Route::get('conversations', [ChatController::class, 'index']);
+        Route::post('conversations', [ChatController::class, 'store']);
+        Route::get('conversations/{conversation}/messages', [ChatController::class, 'messages']);
+        Route::post('conversations/{conversation}/messages', [ChatController::class, 'send'])->middleware('throttle:chat');
+        Route::post('conversations/{conversation}/read', [ChatController::class, 'read']);
 
         Route::get('approvals', [ApprovalController::class, 'index']);
         Route::post('approvals/{user}/approve', [ApprovalController::class, 'approve']);

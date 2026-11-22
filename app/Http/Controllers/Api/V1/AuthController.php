@@ -8,9 +8,11 @@ use App\Http\Requests\Auth\EmailRequest;
 use App\Http\Requests\Auth\LoginRequest;
 use App\Http\Requests\Auth\RegisterRequest;
 use App\Http\Requests\Auth\ResetPasswordRequest;
+use App\Http\Requests\Auth\SocialLoginRequest;
 use App\Http\Requests\Auth\VerifyCodeRequest;
 use App\Http\Resources\UserResource;
 use App\Services\AuthService;
+use App\Services\FirebaseTokenVerifier;
 use App\Services\VerificationCodeService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -62,6 +64,22 @@ class AuthController extends Controller
             $request->input('password'),
             $request->input('device_name') ?: 'android',
         );
+
+        return response()->json([
+            'token' => $result['token'],
+            'token_type' => 'Bearer',
+            'expires_at' => $result['expires_at']->toIso8601String(),
+            'user' => new UserResource($result['user']->load('department')),
+        ]);
+    }
+
+    /**
+     * POST /auth/social : connexion / inscription avec Google ou GitHub.
+     * Réponses : 200 + jeton | 409 PROFILE_REQUIRED | 403 ACCOUNT_PENDING...
+     */
+    public function social(SocialLoginRequest $request, FirebaseTokenVerifier $verifier): JsonResponse
+    {
+        $result = $this->auth->social($request->validated(), $verifier);
 
         return response()->json([
             'token' => $result['token'],

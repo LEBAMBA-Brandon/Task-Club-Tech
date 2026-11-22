@@ -3,12 +3,9 @@
 namespace App\Services;
 
 use App\Enums\CodePurpose;
-use App\Mail\VerificationCodeMail;
 use App\Models\User;
 use App\Models\VerificationCode;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
 
 /**
  * Génère, envoie et vérifie les codes à 6 chiffres.
@@ -18,11 +15,14 @@ use Illuminate\Support\Facades\Mail;
  *  - valable 10 minutes, 5 essais maximum, usage unique ;
  *  - un nouveau code invalide les précédents du même type.
  *
- * Sans compte SMTP (MAIL_MAILER=log), l'e-mail est écrit dans
- * storage/logs/laravel.log : c'est là qu'on lit le code en développement.
+ * Le code part par e-mail (MailService : Brevo en production).
+ * Il n'est JAMAIS renvoyé dans la réponse de l'API, sauf si
+ * CTECH_EXPOSE_CODES=true (tests en local uniquement).
  */
 class VerificationCodeService
 {
+    public function __construct(private readonly MailService $mail) {}
+
     public const TTL_MINUTES = 10;
 
     /** Crée un code, l'envoie par e-mail et le retourne (en clair, pour le mode debug uniquement). */
@@ -42,12 +42,16 @@ class VerificationCodeService
             'expires_at' => now()->addMinutes(self::TTL_MINUTES),
         ]);
 
-        try {
-            Mail::to($user->email)->send(new VerificationCodeMail($user, $code, $purpose));
-        } catch (\Throwable $e) {
-            // L'échec d'envoi ne doit pas révéler d'information au client.
-            Log::error('Envoi du code impossible', ['user' => $user->id, 'error' => $e->getMessage()]);
-        }
+        // L'échec d'envoi est journalisé par MailService, sans rien révéler au client.
+        $this->mail->sendView(
+            $user->email,
+            $user->fullName(),
+            $purpose === CodePurpose::EmailVerification
+                ? 'C-Tech Tasks : votre code de confirmation'
+                : 'C-Tech Tasks : réinitialisation du mot de passe',
+            'mail.verification-code',
+            ['user' => $user, 'code' => $code, 'purpose' => $purpose],
+        );
 
         return $code;
     }
@@ -77,9 +81,12 @@ class VerificationCodeService
         return true;
     }
 
-    /** En local avec APP_DEBUG=true, on renvoie le code dans la réponse pour faciliter les tests. */
+    /**
+     * Renvoyer le code dans la réponse ? Uniquement si CTECH_EXPOSE_CODES=true
+     * ET hors production : pratique pour Postman en local, jamais en ligne.
+     */
     public static function exposeInResponse(): bool
     {
-        return app()->environment('local') && config('app.debug');
+        return (bool) config('services.ctech.expose_codes') && ! app()->environment('production');
     }
 }

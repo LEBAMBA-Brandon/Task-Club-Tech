@@ -109,10 +109,19 @@ class TaskService
             return;
         }
 
-        TaskRecipient::where('user_id', $user->id)
+        $pending = TaskRecipient::where('user_id', $user->id)
             ->whereIn('task_id', $taskIds)
-            ->whereNull('delivered_at')
-            ->update(['delivered_at' => now()]);
+            ->whereNull('delivered_at');
+        $changed = (clone $pending)->pluck('task_id');
+        if ($changed->isEmpty()) {
+            return;
+        }
+        $pending->update(['delivered_at' => now()]);
+
+        // Les auteurs voient passer ✓ -> ✓✓ en direct.
+        foreach (Task::whereIn('id', $changed)->get() as $task) {
+            $this->notifyUpdate($task, $user);
+        }
     }
 
     /** Ouverture du détail : accusé « vu » (✓✓ bleu) si l'utilisateur est destinataire. */
@@ -124,6 +133,7 @@ class TaskService
                 'delivered_at' => $recipient->delivered_at ?? now(),
                 'seen_at' => now(),
             ])->save();
+            $this->notifyUpdate($task, $user);
         }
 
         return $this->load($task);
@@ -140,13 +150,23 @@ class TaskService
             'seen_at' => $recipient->seen_at ?? now(),
             'done_at' => $done ? now() : null,
         ])->save();
+        $this->notifyUpdate($task, $user);
 
         return $this->load($task);
     }
 
     public function addComment(User $user, Task $task, string $body): TaskComment
     {
-        return $task->comments()->create(['user_id' => $user->id, 'body' => $body])->load('user.department');
+        $comment = $task->comments()->create(['user_id' => $user->id, 'body' => $body])->load('user.department');
+        $this->notifyUpdate($task, $user, 'comments');
+
+        return $comment;
+    }
+
+    /** Signal « temps réel » envoyé après la réponse HTTP (voir NotificationService::taskUpdated). */
+    private function notifyUpdate(Task $task, User $actor, string $scope = 'tasks'): void
+    {
+        dispatch(fn () => app(NotificationService::class)->taskUpdated($task, $actor->id, $scope))->afterResponse();
     }
 
     private function load(Task $task): Task

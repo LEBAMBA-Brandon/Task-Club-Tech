@@ -31,7 +31,23 @@ return [
     */
     'firebase' => [
         'project_id' => env('FIREBASE_PROJECT_ID'),
+        // En local : chemin du fichier JSON du compte de service.
         'credentials' => env('FIREBASE_CREDENTIALS', 'storage/app/private/firebase-service-account.json'),
+        // Sur Railway : contenu du fichier JSON (brut ou base64) dans une variable.
+        'credentials_json' => env('FIREBASE_CREDENTIALS_JSON'),
+    ],
+
+    /*
+    | Brevo : envoi des e-mails par API HTTPS (Railway bloque le SMTP).
+    | Créer la clé dans Brevo > SMTP & API > Clés API.
+    */
+    'brevo' => [
+        'key' => env('BREVO_API_KEY'),
+    ],
+
+    'ctech' => [
+        // true = le code à 6 chiffres est aussi renvoyé par l'API (tests locaux uniquement).
+        'expose_codes' => env('CTECH_EXPOSE_CODES', false),
     ],
 
 ];
