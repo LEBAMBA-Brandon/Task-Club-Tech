@@ -51,6 +51,10 @@ class FirebaseMessagingService
     public function sync(iterable $users, string $scope, array $data = []): void
     {
         foreach ($users as $user) {
+            // Navigateurs : pas de message silencieux (ils afficheraient « site mis à jour en arrière-plan »).
+            if ($user->fcm_platform === 'web') {
+                continue;
+            }
             $this->sendToUser($user, null, null, ['type' => 'sync', 'scope' => $scope] + $data);
         }
     }
@@ -59,15 +63,19 @@ class FirebaseMessagingService
      * @param  ?string  $title  null = message de données seul (pas de bannière)
      * @param  array<string,string>  $data  données transmises à l'application (type, task_id, conversation_id...)
      */
-    public function sendToUser(User $user, ?string $title, ?string $body, array $data = []): void
+    /**
+     * @return string|null  null si Firebase a accepté le message, sinon la raison de l'échec
+     *                      (utilisée par le bouton « Tester les notifications »).
+     */
+    public function sendToUser(User $user, ?string $title, ?string $body, array $data = []): ?string
     {
         if (! $user->fcm_token) {
-            return;
+            return 'NO_DEVICE_TOKEN';
         }
         if (! $this->isConfigured()) {
-            Log::debug('Firebase non configuré : notification ignorée', ['user' => $user->id, 'title' => $title]);
+            Log::warning('Firebase non configuré : notification ignorée', ['user' => $user->id, 'title' => $title]);
 
-            return;
+            return 'SERVER_NOT_CONFIGURED';
         }
 
         try {
@@ -79,7 +87,7 @@ class FirebaseMessagingService
         } catch (\Throwable $e) {
             Log::warning('FCM injoignable', ['error' => $e->getMessage()]);
 
-            return;
+            return 'FCM_UNREACHABLE: '.$e->getMessage();
         }
 
         if ($response->failed()) {
@@ -89,7 +97,32 @@ class FirebaseMessagingService
                 $user->forceFill(['fcm_token' => null])->save();
             }
             Log::warning('Échec FCM', ['user' => $user->id, 'status' => $response->status(), 'error' => $status]);
+
+            return 'FCM_'.$status.': '.($response->json('error.message') ?? '');
         }
+
+        return null;
+    }
+
+    /**
+     * Diagnostic complet pour un membre : configuration du serveur, jeton du téléphone,
+     * puis envoi réel d'une notification de test.
+     *
+     * @return array{configured:bool, project_id:?string, has_device_token:bool, sent:bool, reason:?string}
+     */
+    public function diagnose(User $user): array
+    {
+        $reason = $this->sendToUser($user, 'C-Tech Tasks : test réussi 🎉', 'Les notifications fonctionnent sur cet appareil.', [
+            'type' => 'test',
+        ]);
+
+        return [
+            'configured' => $this->isConfigured(),
+            'project_id' => $this->credentials->projectId(),
+            'has_device_token' => (bool) $user->fcm_token,
+            'sent' => $reason === null,
+            'reason' => $reason,
+        ];
     }
 
     /** Message FCM : avec bannière si un titre est fourni, sinon données seules. */
@@ -103,6 +136,10 @@ class FirebaseMessagingService
         if ($title !== null) {
             $message['notification'] = ['title' => $title, 'body' => mb_strimwidth((string) $body, 0, 180, '…')];
             $message['android']['notification'] = ['channel_id' => 'ctech_tasks'];
+            // Version web : un clic sur la notification ouvre l'application (WEB_APP_URL, en https).
+            if ($webUrl = config('services.firebase.web_app_url')) {
+                $message['webpush'] = ['fcm_options' => ['link' => $webUrl]];
+            }
         }
 
         return $message;

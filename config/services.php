@@ -35,6 +35,8 @@ return [
         'credentials' => env('FIREBASE_CREDENTIALS', 'storage/app/private/firebase-service-account.json'),
         // Sur Railway : contenu du fichier JSON (brut ou base64) dans une variable.
         'credentials_json' => env('FIREBASE_CREDENTIALS_JSON'),
+        // Adresse de la version web (https) ouverte quand on clique sur une notification web.
+        'web_app_url' => env('WEB_APP_URL'),
     ],
 
     /*

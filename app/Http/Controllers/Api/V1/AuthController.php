@@ -136,11 +136,23 @@ class AuthController extends Controller
         return response()->json(['message' => 'Mot de passe modifié. Vos autres appareils ont été déconnectés.']);
     }
 
+    /** POST /auth/push-test : envoie une notification de test à l'utilisateur et renvoie le diagnostic. */
+    public function pushTest(Request $request, \App\Services\FirebaseMessagingService $firebase): JsonResponse
+    {
+        return response()->json($firebase->diagnose($request->user()->fresh()));
+    }
+
     /** PUT /auth/fcm-token : enregistre le jeton Firebase du téléphone. */
     public function updateFcmToken(Request $request): JsonResponse
     {
-        $data = $request->validate(['fcm_token' => ['nullable', 'string', 'max:512']]);
-        $request->user()->forceFill(['fcm_token' => $data['fcm_token'] ?? null])->save();
+        $data = $request->validate([
+            'fcm_token' => ['nullable', 'string', 'max:512'],
+            'platform' => ['nullable', 'in:android,web'],
+        ]);
+        $request->user()->forceFill([
+            'fcm_token' => $data['fcm_token'] ?? null,
+            'fcm_platform' => ($data['fcm_token'] ?? null) ? ($data['platform'] ?? 'android') : null,
+        ])->save();
 
         return response()->json(['message' => 'Jeton de notification enregistré.']);
     }

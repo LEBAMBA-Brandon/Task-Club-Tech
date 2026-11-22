@@ -39,6 +39,7 @@ Route::prefix('v1')->group(function () {
         Route::post('auth/logout', [AuthController::class, 'logout']);
         Route::put('auth/fcm-token', [AuthController::class, 'updateFcmToken']);
         Route::put('auth/password', [AuthController::class, 'changePassword']);
+        Route::post('auth/push-test', [AuthController::class, 'pushTest']);
 
         Route::get('departments/{department}/members', [DepartmentController::class, 'members']);
 
