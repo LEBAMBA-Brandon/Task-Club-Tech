@@ -50,24 +50,44 @@ class PushNotificationService {
   /// pour rafraîchir en direct l'écran concerné (voir CountersController.onServerSignal).
   void Function(String scope, Map<String, dynamic> data)? onSignal;
 
+  /// Web, onglet ouvert : afficher un bandeau dans l'appli (titre, texte, destination).
+  void Function(String title, String body, String? payload)? onForegroundNotification;
+
+  /// Ouvre la destination d'un bandeau web (même logique qu'une notification touchée).
+  void open(String? payload) => _openFromPayload(payload);
+
+  /// Notifications prises en charge : application Android et version web (navigateur).
+  bool get _supported => kIsWeb || defaultTargetPlatform == TargetPlatform.android;
+
+  /// Plateforme envoyée au serveur avec le jeton (le web ne reçoit pas les signaux silencieux).
+  String get _platform => kIsWeb ? 'web' : 'android';
+
+  /// Jeton de l'appareil : sur le web, Firebase exige la clé « Web Push » (VAPID).
+  Future<String?> _getToken() => kIsWeb
+      ? FirebaseMessaging.instance.getToken(vapidKey: FirebaseSetup.webPushKey)
+      : FirebaseMessaging.instance.getToken();
+
   /// Conversation actuellement affichée : pas de bannière pour ses nouveaux messages.
   int? activeConversationId;
 
   /// Initialise Firebase et les notifications locales. Renvoie false si Firebase n'est pas configuré.
   Future<bool> init() async {
     if (_ready) return true;
-    if (defaultTargetPlatform != TargetPlatform.android) return false;
+    if (!_supported) return false;
     if (!FirebaseSetup.ready) return false; // voir core/firebase/firebase_setup.dart
 
-    FirebaseMessaging.onBackgroundMessage(firebaseBackgroundHandler);
-
-    await _local.initialize(
-      const InitializationSettings(android: AndroidInitializationSettings('@mipmap/ic_launcher')),
-      onDidReceiveNotificationResponse: (response) => _openFromPayload(response.payload),
-    );
-    await _local
-        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
-        ?.createNotificationChannel(_channel);
+    if (!kIsWeb) {
+      // Android : messages reçus appli fermée + notifications locales (appli ouverte).
+      // Sur le web, c'est le fichier web/firebase-messaging-sw.js qui gère l'arrière-plan.
+      FirebaseMessaging.onBackgroundMessage(firebaseBackgroundHandler);
+      await _local.initialize(
+        const InitializationSettings(android: AndroidInitializationSettings('@mipmap/ic_launcher')),
+        onDidReceiveNotificationResponse: (response) => _openFromPayload(response.payload),
+      );
+      await _local
+          .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+          ?.createNotificationChannel(_channel);
+    }
 
     // Message reçu application ouverte.
     FirebaseMessaging.onMessage.listen((message) {
@@ -87,7 +107,10 @@ class PushNotificationService {
       // 2) Bannière (sauf signal silencieux, ou message de la conversation ouverte).
       final notification = message.notification;
       final inOpenChat = type == 'chat_message' && '${data['conversation_id']}' == '$activeConversationId';
-      if (notification != null && !inOpenChat) {
+      if (notification != null && !inOpenChat && kIsWeb) {
+        // Web, onglet ouvert : bandeau dans l'application (le navigateur n'affiche rien au premier plan).
+        onForegroundNotification?.call(notification.title ?? 'C-Tech Tasks', notification.body ?? '', _payload(data));
+      } else if (notification != null && !inOpenChat) {
         _local.show(
           message.hashCode,
           notification.title,
@@ -125,15 +148,98 @@ class PushNotificationService {
     if (_ref.read(cacheStorageProvider).getString('push_enabled') == 'false') return;
     if (!await init()) return;
     try {
+      if (kIsWeb && FirebaseSetup.webPushKey.isEmpty) return; // clé Web Push pas encore fournie
       await FirebaseMessaging.instance.requestPermission();
-      final token = await FirebaseMessaging.instance.getToken();
+      final token = await _getToken();
       final repo = _ref.read(authRepositoryProvider);
-      await repo.updateFcmToken(token);
+      await repo.updateFcmToken(token, platform: _platform);
       await _tokenSub?.cancel();
-      _tokenSub = FirebaseMessaging.instance.onTokenRefresh.listen((t) => repo.updateFcmToken(t));
+      _tokenSub = FirebaseMessaging.instance.onTokenRefresh.listen((t) => repo.updateFcmToken(t, platform: _platform));
     } catch (e) {
       debugPrint('Enregistrement FCM impossible : $e');
     }
+  }
+
+  /// Diagnostic « Tester les notifications » (Profil › Compte) : vérifie chaque maillon
+  /// de la chaîne et envoie une vraie notification de test via le serveur.
+  Future<List<PushCheck>> diagnose() async {
+    final checks = <PushCheck>[];
+
+    // 1. Plateforme : application Android ou navigateur (Web Push).
+    checks.add(PushCheck(kIsWeb ? 'Version web (navigateur)' : 'Application Android', _supported,
+        _supported ? null : 'Les notifications fonctionnent sur l\'application Android et dans le navigateur, pas dans l\'application Windows.'));
+    if (!_supported) return checks;
+    if (kIsWeb) {
+      final hasKey = FirebaseSetup.webPushKey.isNotEmpty;
+      checks.add(PushCheck('Clé Web Push configurée', hasKey,
+          hasKey ? null : 'La clé « Certificats Web Push » de Firebase n\'est pas encore dans l\'application.'));
+      if (!hasKey) return checks;
+    }
+
+    // 2. Réglage de l'appli.
+    final enabled = _ref.read(cacheStorageProvider).getString('push_enabled') != 'false';
+    checks.add(PushCheck('Notifications activées dans le profil', enabled,
+        enabled ? null : 'Activez l\'interrupteur « Notifications » ci-dessus.'));
+    if (!enabled) return checks;
+
+    // 3. Firebase sur le téléphone.
+    final ready = await init();
+    checks.add(PushCheck('Firebase démarré sur le téléphone', ready,
+        ready ? null : (FirebaseSetup.error ?? 'Fichier google-services.json absent ou invalide.')));
+    if (!ready) return checks;
+
+    // 4. Autorisation Android.
+    final settings = await FirebaseMessaging.instance.requestPermission();
+    final allowed = settings.authorizationStatus == AuthorizationStatus.authorized ||
+        settings.authorizationStatus == AuthorizationStatus.provisional;
+    checks.add(PushCheck('Autorisation du téléphone', allowed,
+        allowed
+            ? null
+            : kIsWeb
+                ? 'Autorisez les notifications pour ce site (icône à gauche de l\'adresse › Notifications › Autoriser).'
+                : 'Autorisez les notifications : Paramètres du téléphone › Applications › C-Tech Tasks › Notifications.'));
+    if (!allowed) return checks;
+
+    // 5. Jeton de l'appareil envoyé au serveur.
+    String? token;
+    try {
+      token = await _getToken();
+      await _ref.read(authRepositoryProvider).updateFcmToken(token, platform: _platform);
+    } catch (e) {
+      checks.add(PushCheck('Appareil enregistré auprès du serveur', false, 'Impossible d\'obtenir ou d\'envoyer le jeton : $e'));
+      return checks;
+    }
+    checks.add(PushCheck('Appareil enregistré auprès du serveur', token != null,
+        token == null ? 'Firebase n\'a pas fourni de jeton (Google Play Services absent ?).' : null));
+    if (token == null) return checks;
+
+    // 6. Le serveur envoie une vraie notification.
+    try {
+      final r = await _ref.read(apiClientProvider).post('/auth/push-test') as Map<String, dynamic>;
+      final configured = r['configured'] == true;
+      checks.add(PushCheck('Firebase configuré sur le serveur', configured,
+          configured ? null : 'Sur Railway, ajoutez FIREBASE_CREDENTIALS_JSON et FIREBASE_PROJECT_ID=task-ctech, puis redéployez.'));
+      if (configured) {
+        final sent = r['sent'] == true;
+        checks.add(PushCheck('Notification de test envoyée', sent,
+            sent ? 'Elle doit apparaître dans quelques secondes.' : _explain('${r['reason'] ?? ''}')));
+      }
+    } catch (e) {
+      checks.add(PushCheck('Serveur joignable', false, '$e'));
+    }
+    return checks;
+  }
+
+  /// Traduit la raison renvoyée par le serveur en conseil compréhensible.
+  String _explain(String reason) {
+    if (reason.contains('SENDER_ID_MISMATCH') || reason.contains('PERMISSION_DENIED')) {
+      return 'Le serveur et l\'application n\'utilisent pas le même projet Firebase (vérifiez FIREBASE_PROJECT_ID=task-ctech et la clé du compte de service).';
+    }
+    if (reason.contains('UNREGISTERED') || reason.contains('INVALID_ARGUMENT')) {
+      return 'Le jeton de cet appareil n\'est plus valide : fermez et rouvrez l\'application puis réessayez.';
+    }
+    if (reason.contains('UNREACHABLE')) return 'Le serveur n\'arrive pas à joindre Firebase : $reason';
+    return 'Refus de Firebase : $reason';
   }
 
   /// Désactive les notifications : le serveur oublie le jeton de ce téléphone.
@@ -177,3 +283,13 @@ class PushNotificationService {
 }
 
 final pushNotificationServiceProvider = Provider<PushNotificationService>((ref) => PushNotificationService(ref));
+
+/// Une étape du diagnostic des notifications.
+class PushCheck {
+  const PushCheck(this.label, this.ok, [this.detail]);
+  final String label;
+  final bool ok;
+
+  /// Conseil (si échec) ou précision (si réussite).
+  final String? detail;
+}

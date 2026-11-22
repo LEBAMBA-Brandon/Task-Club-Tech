@@ -68,6 +68,15 @@ class _HomeShellState extends ConsumerState<HomeShell> with WidgetsBindingObserv
         builder: (_) => ChatScreen(conversationId: id, title: known?.title, subtitle: known?.subtitle),
       ));
     };
+    // Version web, onglet ouvert : bandeau en bas avec un bouton « Ouvrir ».
+    push.onForegroundNotification = (title, body, payload) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        duration: const Duration(seconds: 6),
+        content: Text('$title\n$body', maxLines: 3, overflow: TextOverflow.ellipsis),
+        action: payload == null ? null : SnackBarAction(label: 'Ouvrir', onPressed: () => push.open(payload)),
+      ));
+    };
     push.onOpenApprovals = () {
       if (!mounted) return;
       ref.read(teamTabProvider.notifier).show('requests');

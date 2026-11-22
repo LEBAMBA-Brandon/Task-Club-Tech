@@ -57,6 +57,47 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     }
   }
 
+  /// Lance le diagnostic et affiche chaque étape (✓ / ✗ + conseil).
+  Future<void> _testPush() async {
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const AlertDialog(
+        content: Row(children: [CircularProgressIndicator(), SizedBox(width: 16), Expanded(child: Text('Vérification en cours…'))]),
+      ),
+    );
+    final checks = await ref.read(pushNotificationServiceProvider).diagnose();
+    if (!mounted) return;
+    Navigator.of(context).pop();
+    final allOk = checks.every((c) => c.ok);
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(allOk ? 'Tout est en ordre' : 'Les notifications sont bloquées'),
+        content: SingleChildScrollView(
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+            for (final c in checks)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Icon(c.ok ? Icons.check_circle_rounded : Icons.cancel_rounded,
+                      color: c.ok ? AppColors.done : AppColors.error, size: 20),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(c.label, style: const TextStyle(fontWeight: FontWeight.w600)),
+                      if (c.detail != null) Text(c.detail!, style: const TextStyle(fontSize: 12)),
+                    ]),
+                  ),
+                ]),
+              ),
+          ]),
+        ),
+        actions: [TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Fermer'))],
+      ),
+    );
+  }
+
   Future<void> _confirmLogout() async {
     final ok = await showDialog<bool>(
       context: context,
@@ -157,6 +198,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 style: TextStyle(color: muted, fontSize: 12)),
             value: _push,
             onChanged: _pushBusy ? null : _togglePush,
+          ),
+          _Item(
+            icon: Icons.notifications_active_outlined,
+            label: 'Tester les notifications',
+            onTap: _testPush,
           ),
           ListTile(
             leading: const Icon(Icons.dark_mode_outlined, color: AppColors.violet),

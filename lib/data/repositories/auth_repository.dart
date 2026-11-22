@@ -148,7 +148,9 @@ class AuthRepository {
     return data['message'] as String;
   }
 
-  Future<void> updateFcmToken(String? token) => _api.put('/auth/fcm-token', {'fcm_token': token});
+  /// Jeton de notification de l'appareil ([platform] : android | web).
+  Future<void> updateFcmToken(String? token, {String platform = 'android'}) =>
+      _api.put('/auth/fcm-token', {'fcm_token': token, 'platform': platform});
 
   /// Déconnexion : révoque le jeton côté serveur (si possible) et efface tout localement.
   Future<void> logout() async {

@@ -23,6 +23,13 @@ class FirebaseSetup {
   static const _projectId = String.fromEnvironment('FIREBASE_PROJECT_ID', defaultValue: 'task-ctech');
   static const _senderId = String.fromEnvironment('FIREBASE_SENDER_ID', defaultValue: '755413969568');
 
+  /// Clé publique « Web Push » (Firebase › Paramètres du projet › Cloud Messaging ›
+  /// Certificats Web Push). Indispensable pour les notifications dans le navigateur.
+  static const webPushKey = String.fromEnvironment(
+    'FIREBASE_WEB_PUSH_KEY',
+    defaultValue: 'BJClyj-bdzaQZTib4tWiJ5PiQctFkAO-aMvR2F3ZrToiW2aQYwscp89RSTBg4vgUUCV1CtBKFuBV09KL0rLV3I8',
+  );
+
   /// Vrai si Firebase a pu démarrer sur cette plateforme.
   static bool ready = false;
 
