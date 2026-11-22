@@ -52,7 +52,7 @@ class AuthController extends Notifier<AuthState> {
     unawaited(ref.read(pushNotificationServiceProvider).registerDevice());
   }
 
-  /// Connexion Google / GitHub : [idToken] Firebase + profil (seulement pour un nouveau compte).
+  /// Connexion Google : [idToken] Firebase + profil (seulement pour un nouveau compte).
   /// Les erreurs (PROFILE_REQUIRED, ACCOUNT_PENDING...) remontent à l'écran sous forme d'ApiException.
   Future<void> signInSocial(
     String idToken, {

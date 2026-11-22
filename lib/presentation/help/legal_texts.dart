@@ -42,9 +42,9 @@ class LegalTexts {
     ('Messagerie',
         'Les messages privés ne sont visibles que par les deux membres concernés ; ceux du groupe d\'un '
             'département, par ses membres. Restez courtois : le bureau peut suspendre un compte en cas d\'abus.'),
-    ('Connexion Google / GitHub',
+    ('Connexion Google',
         'Si vous choisissez cette option, l\'application reçoit seulement votre nom et votre adresse e-mail. '
-            'Elle n\'a jamais accès à votre mot de passe Google ou GitHub.'),
+            'Elle n\'a jamais accès à votre mot de passe Google.'),
     ('Notifications',
         'Si vous les activez, un identifiant technique de votre téléphone est enregistré pour vous envoyer les '
             'nouvelles tâches. Vous pouvez les désactiver à tout moment dans Profil › Compte › Notifications.'),
@@ -77,7 +77,7 @@ class LegalTexts {
         'Onglet « Messages » › « Nouveau message », puis cherchez son nom. Le groupe de votre département '
             'est déjà dans la liste.'),
     ('Puis-je m\'inscrire avec Google ?',
-        'Oui : sur l\'écran d\'accueil, touchez « Google » ou « GitHub ». Il restera à choisir votre département '
+        'Oui : sur l\'écran d\'accueil, touchez « Continuer avec Google ». Il restera à choisir votre département '
             'et votre poste, puis à attendre la validation du bureau.'),
     ('Les informations se mettent-elles à jour toutes seules ?',
         'Oui : les nouvelles tâches, coches, messages et demandes apparaissent automatiquement, sans recharger. '

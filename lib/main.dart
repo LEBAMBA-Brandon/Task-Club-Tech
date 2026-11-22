@@ -1,5 +1,3 @@
-import 'package:firebase_core/firebase_core.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,6 +5,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'app.dart';
+import 'core/firebase/firebase_setup.dart';
 import 'providers/core_providers.dart';
 
 /// Point d'entrée.
@@ -22,15 +21,8 @@ Future<void> main() async {
   await SystemChrome.setPreferredOrientations(DeviceOrientation.values);
   final prefs = await SharedPreferences.getInstance();
 
-  // Firebase (notifications + connexion Google/GitHub) : configuré pour Android
-  // via android/app/google-services.json. Sans ce fichier, l'appli fonctionne sans.
-  if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
-    try {
-      await Firebase.initializeApp();
-    } catch (e) {
-      debugPrint('Firebase indisponible : $e');
-    }
-  }
+  // Firebase (notifications + connexion Google). Sans configuration, l'appli fonctionne sans.
+  await FirebaseSetup.init();
 
   runApp(ProviderScope(
     overrides: [sharedPreferencesProvider.overrideWithValue(prefs)],

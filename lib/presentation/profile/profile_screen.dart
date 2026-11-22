@@ -130,7 +130,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               icon: Icons.groups_rounded,
               label: user.isPresidency ? 'Suivi des membres du club' : 'Suivi des membres du département',
               onTap: () {
-                ref.read(teamTabProvider.notifier).show(0);
+                ref.read(teamTabProvider.notifier).show('members');
                 _goTo('team');
               },
             ),
@@ -139,7 +139,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               label: 'Demandes d\'inscription',
               trailing: counters.approvalsPending > 0 ? Badge(label: Text('${counters.approvalsPending}')) : null,
               onTap: () {
-                ref.read(teamTabProvider.notifier).show(1);
+                ref.read(teamTabProvider.notifier).show('requests');
                 _goTo('team');
               },
             ),

@@ -91,7 +91,7 @@ class AuthRepository {
     return session;
   }
 
-  /// Connexion avec Google / GitHub : [idToken] vient de Firebase Authentication.
+  /// Connexion avec Google : [idToken] vient de Firebase Authentication.
   /// Pour un nouveau compte, l'API répond PROFILE_REQUIRED (ApiException) : on rappelle
   /// alors cette méthode avec le département, le poste et l'acceptation des conditions.
   Future<AuthSession> social(
@@ -105,11 +105,11 @@ class AuthRepository {
     final data = await _api.post('/auth/social', {
       'id_token': idToken,
       'device_name': 'android',
-      if (firstName != null) 'first_name': firstName.trim(),
-      if (lastName != null) 'last_name': lastName.trim(),
-      if (departmentId != null) 'department_id': departmentId,
-      if (position != null) 'position': position,
-      if (acceptTerms != null) 'accept_terms': acceptTerms,
+      'first_name': ?firstName?.trim(),
+      'last_name': ?lastName?.trim(),
+      'department_id': ?departmentId,
+      'position': ?position,
+      'accept_terms': ?acceptTerms,
     });
     final session = AuthSession(
       token: data['token'] as String,

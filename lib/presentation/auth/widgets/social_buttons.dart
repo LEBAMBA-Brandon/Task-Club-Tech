@@ -7,12 +7,13 @@ import '../../../providers/auth_provider.dart';
 import '../../../providers/core_providers.dart';
 import 'auth_widgets.dart';
 
-/// Boutons « Continuer avec Google / GitHub ».
+/// Bouton « Continuer avec Google ».
 ///
-/// Déroulé : connexion chez Google ou GitHub (Firebase) -> jeton envoyé à l'API.
-///  - compte actif           : l'utilisateur est connecté ;
-///  - nouveau compte         : [onProfileRequired] ouvre le formulaire « Dernière étape » ;
-///  - compte en attente      : [onPending] affiche « Presque prêt ».
+/// Déroulé : connexion Google (Firebase) -> jeton envoyé à l'API.
+///  - compte actif      : l'utilisateur est connecté ;
+///  - nouveau compte    : [onProfileRequired] ouvre le formulaire « Dernière étape » ;
+///  - compte en attente : [onPending] affiche « Presque prêt ».
+/// Toute erreur est affichée dans la carte (jamais d'échec silencieux).
 class SocialButtons extends ConsumerStatefulWidget {
   const SocialButtons({super.key, required this.accent, required this.onProfileRequired, required this.onPending});
 
@@ -25,20 +26,20 @@ class SocialButtons extends ConsumerStatefulWidget {
 }
 
 class _SocialButtonsState extends ConsumerState<SocialButtons> {
-  SocialProvider? _loading;
+  bool _loading = false;
   String? _error;
 
-  Future<void> _signIn(SocialProvider provider) async {
+  Future<void> _signIn() async {
     setState(() {
-      _loading = provider;
+      _loading = true;
       _error = null;
     });
     String? idToken;
     try {
-      idToken = await ref.read(socialAuthProvider).signIn(provider);
+      idToken = await ref.read(socialAuthProvider).signInWithGoogle();
       await ref.read(authControllerProvider.notifier).signInSocial(idToken);
     } on SocialAuthException catch (e) {
-      if (mounted && !e.cancelled) setState(() => _error = e.message);
+      if (mounted) setState(() => _error = e.message);
     } on ApiException catch (e) {
       if (!mounted) return;
       final token = idToken;
@@ -49,8 +50,10 @@ class _SocialButtonsState extends ConsumerState<SocialButtons> {
       } else {
         setState(() => _error = e.message);
       }
+    } catch (e) {
+      if (mounted) setState(() => _error = 'Connexion Google impossible : $e');
     } finally {
-      if (mounted) setState(() => _loading = null);
+      if (mounted) setState(() => _loading = false);
     }
   }
 
@@ -64,45 +67,15 @@ class _SocialButtonsState extends ConsumerState<SocialButtons> {
         Expanded(child: Divider(color: Colors.white12)),
         Padding(
           padding: EdgeInsets.symmetric(horizontal: 10),
-          child: Text('ou continuer avec', style: TextStyle(color: Colors.white54, fontSize: 12)),
+          child: Text('ou', style: TextStyle(color: Colors.white54, fontSize: 12)),
         ),
         Expanded(child: Divider(color: Colors.white12)),
       ]),
       const SizedBox(height: 12),
       if (_error != null) AuthError(_error),
-      Row(children: [
-        Expanded(
-          child: _ProviderButton(
-            label: 'Google',
-            badge: const _GoogleBadge(),
-            loading: _loading == SocialProvider.google,
-            onPressed: _loading == null ? () => _signIn(SocialProvider.google) : null,
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: _ProviderButton(
-            label: 'GitHub',
-            badge: const Icon(Icons.code_rounded, size: 18, color: Colors.white),
-            loading: _loading == SocialProvider.github,
-            onPressed: _loading == null ? () => _signIn(SocialProvider.github) : null,
-          ),
-        ),
-      ]),
-    ]);
-  }
-}
-
-class _ProviderButton extends StatelessWidget {
-  const _ProviderButton({required this.label, required this.badge, required this.loading, required this.onPressed});
-  final String label;
-  final Widget badge;
-  final bool loading;
-  final VoidCallback? onPressed;
-
-  @override
-  Widget build(BuildContext context) => SizedBox(
-        height: 46,
+      SizedBox(
+        width: double.infinity,
+        height: 48,
         child: OutlinedButton(
           style: OutlinedButton.styleFrom(
             foregroundColor: Colors.white,
@@ -110,16 +83,18 @@ class _ProviderButton extends StatelessWidget {
             backgroundColor: Colors.white.withValues(alpha: 0.04),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),
-          onPressed: onPressed,
-          child: loading
+          onPressed: _loading ? null : _signIn,
+          child: _loading
               ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-              : Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                  badge,
-                  const SizedBox(width: 8),
-                  Text(label, style: const TextStyle(fontWeight: FontWeight.w700)),
+              : const Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                  _GoogleBadge(),
+                  SizedBox(width: 10),
+                  Text('Continuer avec Google', style: TextStyle(fontWeight: FontWeight.w700)),
                 ]),
         ),
-      );
+      ),
+    ]);
+  }
 }
 
 /// « G » coloré (évite d'embarquer le logo officiel).
@@ -128,10 +103,10 @@ class _GoogleBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        width: 20,
-        height: 20,
+        width: 22,
+        height: 22,
         alignment: Alignment.center,
         decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-        child: const Text('G', style: TextStyle(color: Color(0xFF4285F4), fontWeight: FontWeight.w900, fontSize: 13)),
+        child: const Text('G', style: TextStyle(color: Color(0xFF4285F4), fontWeight: FontWeight.w900, fontSize: 14)),
       );
 }

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/models/chat.dart';
 import '../data/models/comment.dart';
+import '../data/models/department_overview.dart';
 import '../data/models/member.dart';
 import '../data/models/meta.dart';
 import '../data/models/task.dart';
@@ -73,15 +74,31 @@ class HomeSectionController extends Notifier<String> {
 
 final homeSectionProvider = NotifierProvider<HomeSectionController, String>(HomeSectionController.new);
 
-/// Onglet ouvert dans la page Équipe : 0 = Membres, 1 = Demandes.
-class TeamTabController extends Notifier<int> {
+/// Onglet ouvert dans la page Équipe : departments | members | requests.
+class TeamTabController extends Notifier<String> {
   @override
-  int build() => 0;
+  String build() => 'members';
 
-  void show(int tab) => state = tab;
+  void show(String tab) => state = tab;
 }
 
-final teamTabProvider = NotifierProvider<TeamTabController, int>(TeamTabController.new);
+final teamTabProvider = NotifierProvider<TeamTabController, String>(TeamTabController.new);
+
+/// Département sélectionné dans la liste des membres (null = tous).
+/// Toucher un département dans le tableau de bord le renseigne.
+class MemberDepartmentFilter extends Notifier<int?> {
+  @override
+  int? build() => null;
+
+  void set(int? departmentId) => state = departmentId;
+}
+
+final memberDepartmentFilterProvider = NotifierProvider<MemberDepartmentFilter, int?>(MemberDepartmentFilter.new);
+
+/// Tableau de bord des départements (président / vice-président).
+final departmentsOverviewProvider = FutureProvider<List<DepartmentOverview>>(
+  (ref) => ref.watch(teamRepositoryProvider).departmentsOverview(),
+);
 
 /// Préférences simples enregistrées sur l'appareil (notifications, tutoriel déjà vu).
 class DevicePrefs {

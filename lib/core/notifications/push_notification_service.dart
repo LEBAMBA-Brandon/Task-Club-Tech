@@ -7,6 +7,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../providers/core_providers.dart';
+import '../firebase/firebase_setup.dart';
 
 /// Réception d'une notification quand l'application est fermée / en arrière-plan.
 /// Doit être une fonction de premier niveau.
@@ -56,12 +57,7 @@ class PushNotificationService {
   Future<bool> init() async {
     if (_ready) return true;
     if (defaultTargetPlatform != TargetPlatform.android) return false;
-    try {
-      if (Firebase.apps.isEmpty) await Firebase.initializeApp();
-    } catch (e) {
-      debugPrint('Firebase non configuré (google-services.json absent) : $e');
-      return false;
-    }
+    if (!FirebaseSetup.ready) return false; // voir core/firebase/firebase_setup.dart
 
     FirebaseMessaging.onBackgroundMessage(firebaseBackgroundHandler);
 

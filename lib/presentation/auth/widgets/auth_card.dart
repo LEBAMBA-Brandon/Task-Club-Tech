@@ -37,7 +37,7 @@ class _AuthCardState extends ConsumerState<AuthCard> {
   AuthMode _mode = AuthMode.signIn;
   String _email = '';
 
-  /// Inscription Google / GitHub en cours : jeton Firebase + nom pré-rempli.
+  /// Inscription Google en cours : jeton Firebase + nom pré-rempli.
   String? _socialToken;
   Map<String, dynamic> _socialData = const {};
 
@@ -46,7 +46,7 @@ class _AuthCardState extends ConsumerState<AuthCard> {
         if (email != null) _email = email;
       });
 
-  /// Nouveau compte Google / GitHub : il reste à choisir le département et le poste.
+  /// Nouveau compte Google : il reste à choisir le département et le poste.
   void _completeSocialProfile(String idToken, Map<String, dynamic> data) => setState(() {
         _socialToken = idToken;
         _socialData = data;
@@ -781,9 +781,9 @@ class _PendingView extends StatelessWidget {
   }
 }
 
-// ============================================================== Profil après Google / GitHub
+// ============================================================== Profil après Google
 
-/// Nouveau compte créé avec Google ou GitHub : l'adresse est déjà confirmée,
+/// Nouveau compte créé avec Google : l'adresse est déjà confirmée,
 /// il reste le nom, le département, le poste et les conditions d'utilisation.
 class _SocialProfileForm extends ConsumerStatefulWidget {
   const _SocialProfileForm({

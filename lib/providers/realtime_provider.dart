@@ -54,6 +54,7 @@ class CountersController extends Notifier<Counters> {
       if (next.approvalsPending != previous.approvalsPending) {
         ref.invalidate(approvalsProvider);
         ref.invalidate(membersProvider);
+        ref.invalidate(departmentsOverviewProvider);
       }
       if (next.messagesUnread != previous.messagesUnread) ref.invalidate(conversationsProvider);
     } catch (_) {
@@ -89,6 +90,7 @@ class CountersController extends Notifier<Counters> {
       case 'approvals':
         ref.invalidate(approvalsProvider);
         ref.invalidate(membersProvider);
+        ref.invalidate(departmentsOverviewProvider);
       case 'chat':
         ref.invalidate(conversationsProvider);
     }

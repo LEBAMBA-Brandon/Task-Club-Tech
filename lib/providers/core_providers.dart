@@ -51,5 +51,5 @@ final chatRepositoryProvider =
 
 final teamRepositoryProvider = Provider<TeamRepository>((ref) => TeamRepository(ref.watch(apiClientProvider)));
 
-/// Connexion Google / GitHub (Firebase Authentication).
+/// Connexion Google (Firebase Authentication).
 final socialAuthProvider = Provider<SocialAuthService>((ref) => SocialAuthService());

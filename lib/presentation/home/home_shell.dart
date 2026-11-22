@@ -70,7 +70,7 @@ class _HomeShellState extends ConsumerState<HomeShell> with WidgetsBindingObserv
     };
     push.onOpenApprovals = () {
       if (!mounted) return;
-      ref.read(teamTabProvider.notifier).show(1);
+      ref.read(teamTabProvider.notifier).show('requests');
       ref.read(homeSectionProvider.notifier).go('team');
     };
 
@@ -101,6 +101,7 @@ class _HomeShellState extends ConsumerState<HomeShell> with WidgetsBindingObserv
 
   List<_Section> _sections(bool canFollowTeam) {
     final counters = ref.watch(countersProvider);
+    final user = ref.watch(currentUserProvider);
     return [
       _Section('received', 'Reçues', Icons.inbox_outlined, Icons.inbox_rounded,
           (_) => const TaskListScreen(key: ValueKey('received'), box: 'received'),
@@ -112,7 +113,8 @@ class _HomeShellState extends ConsumerState<HomeShell> with WidgetsBindingObserv
       if (canFollowTeam)
         _Section('team', 'Équipe', Icons.groups_outlined, Icons.groups_rounded,
             (_) => TeamScreen(initialTab: ref.watch(teamTabProvider)),
-            title: 'Suivi de l\'équipe', badge: counters.approvalsPending),
+            title: (user?.isPresidency ?? false) ? 'Administration du club' : 'Suivi de l\'équipe',
+            badge: counters.approvalsPending),
       _Section('profile', 'Profil', Icons.person_outline, Icons.person, (_) => const ProfileScreen(), title: 'Mon profil'),
     ];
   }
@@ -139,7 +141,7 @@ class _HomeShellState extends ConsumerState<HomeShell> with WidgetsBindingObserv
 
     void select(int i) {
       ref.read(homeSectionProvider.notifier).go(sections[i].id);
-      if (sections[i].id == 'team' && sections[i].badge > 0) ref.read(teamTabProvider.notifier).show(1);
+      if (sections[i].id == 'team' && sections[i].badge > 0) ref.read(teamTabProvider.notifier).show('requests');
       _counters.refresh();
     }
 
