@@ -93,6 +93,15 @@ class TaskService
         return $page;
     }
 
+    /** Nombre de tâches reçues que l'utilisateur n'a pas encore ouvertes (badge « Reçues »). */
+    public function unreadCount(User $user): int
+    {
+        return TaskRecipient::where('user_id', $user->id)
+            ->whereNull('seen_at')
+            ->whereHas('task')
+            ->count();
+    }
+
     /** Accusé « reçu » (✓✓ gris) pour une liste de tâches. */
     public function markDelivered(User $user, array $taskIds): void
     {

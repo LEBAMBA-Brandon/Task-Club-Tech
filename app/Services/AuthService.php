@@ -124,4 +124,20 @@ class AuthService
             $user->tokens()->delete();
         });
     }
+
+    /**
+     * Change le mot de passe d'un utilisateur connecté.
+     * Les autres appareils sont déconnectés ; l'appareil courant reste connecté.
+     */
+    public function changePassword(User $user, string $current, string $new, ?int $keepTokenId): void
+    {
+        if (! Hash::check($current, $user->password)) {
+            throw ValidationException::withMessages(['current_password' => 'Mot de passe actuel incorrect.']);
+        }
+
+        DB::transaction(function () use ($user, $new, $keepTokenId) {
+            $user->forceFill(['password' => $new])->save();
+            $user->tokens()->when($keepTokenId, fn ($q) => $q->where('id', '!=', $keepTokenId))->delete();
+        });
+    }
 }

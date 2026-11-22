@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Auth\ChangePasswordRequest;
 use App\Http\Requests\Auth\EmailRequest;
 use App\Http\Requests\Auth\LoginRequest;
 use App\Http\Requests\Auth\RegisterRequest;
@@ -101,6 +102,20 @@ class AuthController extends Controller
         $request->user()->currentAccessToken()->delete();
 
         return response()->json(['message' => 'Déconnecté.']);
+    }
+
+    /** PUT /auth/password : changement de mot de passe depuis le profil. */
+    public function changePassword(ChangePasswordRequest $request): JsonResponse
+    {
+        $token = $request->user()->currentAccessToken();
+        $this->auth->changePassword(
+            $request->user(),
+            $request->input('current_password'),
+            $request->input('password'),
+            is_object($token) && isset($token->id) ? (int) $token->id : null,
+        );
+
+        return response()->json(['message' => 'Mot de passe modifié. Vos autres appareils ont été déconnectés.']);
     }
 
     /** PUT /auth/fcm-token : enregistre le jeton Firebase du téléphone. */

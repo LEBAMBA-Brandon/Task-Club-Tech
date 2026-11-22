@@ -31,11 +31,14 @@ class TaskFlowTest extends TestCase
             'urgency' => 'red',
         ])->assertCreated()->assertJsonPath('data.stats.total', 1)->json('data.id');
 
-        // Le membre liste ses tâches : accusé « reçu ».
+        // Le membre a 1 tâche non lue.
         Sanctum::actingAs($member);
+        $this->getJson('/api/v1/tasks/unread-count')->assertJson(['count' => 1]);
+        // Il liste ses tâches : accusé « reçu ».
         $this->getJson('/api/v1/tasks?box=received')->assertOk()->assertJsonCount(1, 'data');
         // Il ouvre la tâche : accusé « vu ».
         $this->getJson("/api/v1/tasks/{$taskId}")->assertOk()->assertJsonPath('data.my_state.state', 'seen');
+        $this->getJson('/api/v1/tasks/unread-count')->assertJson(['count' => 0]);
         // Il coche « effectué ».
         $this->postJson("/api/v1/tasks/{$taskId}/done")->assertOk()->assertJsonPath('data.my_state.state', 'done');
         $this->postJson("/api/v1/tasks/{$taskId}/comments", ['body' => 'Fait !'])->assertCreated();

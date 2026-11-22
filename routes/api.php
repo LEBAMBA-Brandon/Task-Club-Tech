@@ -34,10 +34,12 @@ Route::prefix('v1')->group(function () {
         Route::get('auth/me', [AuthController::class, 'me']);
         Route::post('auth/logout', [AuthController::class, 'logout']);
         Route::put('auth/fcm-token', [AuthController::class, 'updateFcmToken']);
+        Route::put('auth/password', [AuthController::class, 'changePassword']);
 
         Route::get('departments/{department}/members', [DepartmentController::class, 'members']);
 
         Route::post('tasks/delivered', [TaskController::class, 'delivered']);
+        Route::get('tasks/unread-count', [TaskController::class, 'unreadCount']);
         Route::get('tasks', [TaskController::class, 'index']);
         Route::post('tasks', [TaskController::class, 'store']);
         Route::get('tasks/{task}', [TaskController::class, 'show']);

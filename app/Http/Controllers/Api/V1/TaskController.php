@@ -32,6 +32,12 @@ class TaskController extends Controller
         );
     }
 
+    /** GET /tasks/unread-count : tâches reçues non lues. */
+    public function unreadCount(Request $request): JsonResponse
+    {
+        return response()->json(['count' => $this->tasks->unreadCount($request->user())]);
+    }
+
     /** POST /tasks */
     public function store(StoreTaskRequest $request): JsonResponse
     {
