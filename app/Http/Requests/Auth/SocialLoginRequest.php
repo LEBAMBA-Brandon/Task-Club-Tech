@@ -10,7 +10,7 @@ use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 
 /**
- * Connexion Google / GitHub. Les champs du profil ne sont demandés
+ * Connexion Google. Les champs du profil ne sont demandés
  * que pour un nouveau compte (2e appel, après la réponse PROFILE_REQUIRED).
  */
 class SocialLoginRequest extends FormRequest

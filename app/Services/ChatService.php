@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Conversation;
+use App\Models\Department;
 use App\Models\Message;
 use App\Models\User;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -14,6 +15,7 @@ use Illuminate\Support\Facades\DB;
  * Messagerie entre membres.
  *  - Chaque membre fait automatiquement partie du groupe de son département.
  *  - Il peut écrire en privé à n'importe quel membre actif (conversation « directe »).
+ *  - Le président et le vice-président (administrateurs) font partie de TOUS les groupes de département.
  *  - « Non lu » = messages des autres postés après sa dernière lecture (last_read_at).
  */
 class ChatService
@@ -29,10 +31,22 @@ class ChatService
         return $group;
     }
 
+    /** Administrateurs : membres de tous les groupes de département. */
+    private function joinAllDepartmentGroups(User $user): void
+    {
+        foreach (Department::pluck('id') as $departmentId) {
+            Conversation::firstOrCreate(['type' => Conversation::DEPARTMENT, 'department_id' => $departmentId])
+                ->participants()->syncWithoutDetaching([$user->id]);
+        }
+    }
+
     /** Conversations du membre, la plus récente en premier, avec le nombre de messages non lus. */
     public function listFor(User $user): Collection
     {
         $this->ensureDepartmentGroup($user);
+        if ($user->isPresidency()) {
+            $this->joinAllDepartmentGroups($user);
+        }
 
         return $this->visibleConversations($user)
             ->with(['department', 'lastMessage.user', 'participants.department'])
@@ -122,8 +136,10 @@ class ChatService
     public function authorize(User $user, Conversation $conversation): void
     {
         $isParticipant = $conversation->participants()->where('users.id', $user->id)->exists();
-        // Un membre qui a changé de département ne voit plus l'ancien groupe.
-        $stillInDepartment = ! $conversation->isDepartment() || $conversation->department_id === $user->department_id;
+        // Un membre qui a changé de département ne voit plus l'ancien groupe (sauf administrateurs).
+        $stillInDepartment = ! $conversation->isDepartment()
+            || $user->isPresidency()
+            || $conversation->department_id === $user->department_id;
 
         if (! $isParticipant || ! $stillInDepartment) {
             throw new AuthorizationException('Vous ne participez pas à cette conversation.');
@@ -133,6 +149,10 @@ class ChatService
     /** Conversations privées + groupe de SON département actuel. */
     private function visibleConversations(User $user)
     {
+        if ($user->isPresidency()) {
+            return $user->conversations();
+        }
+
         return $user->conversations()->where(fn ($q) => $q->where('conversations.type', Conversation::DIRECT)
             ->orWhere('conversations.department_id', $user->department_id));
     }

@@ -60,6 +60,10 @@ Route::prefix('v1')->group(function () {
         Route::get('members', [MemberController::class, 'index']);
         Route::get('directory', [MemberController::class, 'directory']);
 
+        // Administration (président / vice-président)
+        Route::get('admin/departments', [MemberController::class, 'departments']);
+        Route::patch('members/{user}', [MemberController::class, 'update']);
+
         // Messagerie
         Route::get('conversations', [ChatController::class, 'index']);
         Route::post('conversations', [ChatController::class, 'store']);

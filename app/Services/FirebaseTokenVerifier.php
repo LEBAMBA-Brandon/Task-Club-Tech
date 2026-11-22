@@ -7,9 +7,9 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Vérifie un « ID token » Firebase Authentication (connexion Google, GitHub...).
+ * Vérifie un « ID token » Firebase Authentication (connexion Google).
  *
- * L'application se connecte d'abord à Firebase avec Google ou GitHub, puis envoie
+ * L'application se connecte d'abord à Firebase avec Google, puis envoie
  * à l'API le jeton que Firebase lui a donné. On vérifie ici, sans bibliothèque :
  *  - la signature RS256 avec les certificats publics de Google ;
  *  - l'émetteur (iss) et le destinataire (aud) = notre projet Firebase ;

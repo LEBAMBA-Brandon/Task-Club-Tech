@@ -74,7 +74,7 @@ class AuthController extends Controller
     }
 
     /**
-     * POST /auth/social : connexion / inscription avec Google ou GitHub.
+     * POST /auth/social : connexion / inscription avec Google.
      * Réponses : 200 + jeton | 409 PROFILE_REQUIRED | 403 ACCOUNT_PENDING...
      */
     public function social(SocialLoginRequest $request, FirebaseTokenVerifier $verifier): JsonResponse

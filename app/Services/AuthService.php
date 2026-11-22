@@ -96,13 +96,13 @@ class AuthService
     }
 
     /**
-     * Connexion / inscription avec Google ou GitHub (via Firebase Authentication).
+     * Connexion / inscription avec Google (via Firebase Authentication).
      *
      *  - Compte existant : même contrôle que la connexion classique, puis jeton.
      *  - Nouveau compte : il faut le département, le poste et l'acceptation des conditions.
      *    S'ils manquent -> PROFILE_REQUIRED (409) avec le nom/prénom pré-remplis.
      *    Sinon le compte est créé « en attente de validation » : pas de code e-mail,
-     *    Google / GitHub ont déjà confirmé l'adresse.
+     *    Google ont déjà confirmé l'adresse.
      *
      * @param  array{id_token:string, first_name?:string, last_name?:string, department_id?:int, position?:string, accept_terms?:bool, device_name?:string}  $data
      */
@@ -136,7 +136,7 @@ class AuthService
             $user->forceFill(['email_verified_at' => now()])->save();
             dispatch(fn () => app(NotificationService::class)->approvalRequested($user))->afterResponse();
         } elseif ($user->status === UserStatus::PendingVerification) {
-            // Inscrit par e-mail mais jamais confirmé : Google / GitHub confirment l'adresse.
+            // Inscrit par e-mail mais jamais confirmé : Google confirment l'adresse.
             $user->forceFill(['email_verified_at' => now(), 'status' => UserStatus::PendingApproval])->save();
             dispatch(fn () => app(NotificationService::class)->approvalRequested($user))->afterResponse();
         }

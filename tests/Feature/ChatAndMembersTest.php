@@ -33,7 +33,7 @@ class ChatAndMembersTest extends TestCase
         // Alice ouvre une conversation avec Bob et lui écrit.
         Sanctum::actingAs($alice);
         $conversationId = $this->postJson('/api/v1/conversations', ['user_id' => $bob->id])
-            ->assertOk()->json('data.id');
+            ->assertSuccessful()->json('data.id');
         $this->postJson("/api/v1/conversations/{$conversationId}/messages", ['body' => 'Salut Bob'])->assertCreated();
 
         // Bob a 1 message non lu, puis 0 après lecture.

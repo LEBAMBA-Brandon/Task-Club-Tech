@@ -8,7 +8,7 @@ use RuntimeException;
 /**
  * Levée quand un compte ne peut pas (encore) se connecter :
  * e-mail non confirmé, en attente de validation, refusé, suspendu,
- * ou profil à compléter après une connexion Google / GitHub.
+ * ou profil à compléter après une connexion Google.
  * L'application Flutter lit le champ « code » pour afficher le bon écran ;
  * « data » transporte des informations utiles (ex. nom pré-rempli).
  */
