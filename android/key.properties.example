@@ -1,0 +1,5 @@
+# Exemple de configuration (à dupliquer en key.properties)
+storePassword=VOTRE_MOT_DE_PASSE_KEYSTORE
+keyPassword=VOTRE_MOT_DE_PASSE_CLE
+keyAlias=task_ctech
+storeFile=task_ctech_release.jks
