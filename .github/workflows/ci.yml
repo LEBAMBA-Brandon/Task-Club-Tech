@@ -5,6 +5,8 @@ on:
     branches: [main]
   push:
     branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
 
 jobs:
   api:
@@ -34,6 +36,8 @@ jobs:
 
   flutter:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
@@ -50,6 +54,22 @@ jobs:
         run: |
           flutter analyze
           flutter test
+
+      - name: Configurer la signature Android Release
+        working-directory: task_ctech/android
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 --decode > app/task_ctech_release.jks
+            printf "storePassword=%s\nkeyPassword=%s\nkeyAlias=%s\nstoreFile=task_ctech_release.jks\n" \
+              "$KEYSTORE_PASSWORD" "$KEY_PASSWORD" "$KEY_ALIAS" > key.properties
+          else
+            echo "KEYSTORE_BASE64 non défini : signature debug utilisée."
+          fi
 
       - name: Construire l’APK Android
         working-directory: task_ctech
@@ -70,3 +90,12 @@ jobs:
         with:
           name: web-app
           path: task_ctech/build/web
+
+      - name: Publier la Release GitHub (APK pour Uptodown)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: task_ctech/build/app/outputs/flutter-apk/app-release.apk
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
